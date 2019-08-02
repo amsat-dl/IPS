@@ -1,0 +1,563 @@
+Updated 2002 Apr 27 [Sat] 0828 utc
+
+
+IPS  Pseudocode
+---------------
+An IPS implementation requires some 50 elementary routines which need to
+be written in the language of the host machine.  Description of these
+routines is given below in pseudocode.
+
+These primitives could be written in Basic, Pascal, C, or native machine code
+(i.e. assembly language) or anything.
+
+The information in this document, together with the book  "IPS - High Level
+Programming of Small Systems" by Karl Meinzer (1978), ISBN 0-9530507-0-X
+contain sufficient information to enable a programmer to write an IPS virtual
+machine for any platform.
+
+Pseudocode language words used
+------------------------------
+  poke(a,w)    put word w at address a
+  pokeB(a,b)   put byte b at address a
+  peek(a)      get word at address a
+  peekB(a)     get byte at address a
+
+IPS Stacks
+----------
+In this document, stacks are assumed to grow with new items at numerically lower
+address (Full Descending Stack).  Stack pointers point to most recent item (Top
+of stack).  The order of bytes of a data word on a stack is not defined, but in
+this document the LSbyte is assumed at the lower address (little endian).
+Ascending stacks are not proscribed.
+
+  ps           parameter stack pointer
+  rs           return stack pointer
+
+  push_ps      place item on parameter stack:  equivalent to  ps-=2; poke(ps,w)
+  pull_ps      get item off parameter stack:   equivalent to  peek(ps); ps+=2
+
+  push_rs      place item on return stack:     equivalent to  rs-=2; poke(rs,w)
+  pull_rs      get item off return stack:      equivalent to  peek(rs); rs+=2
+
+  jump label   jump to address of given label
+
+Operations
+----------
++ - =      and so on have their usual meaning
+<<         shift left specified number of places  e.g. X << 8
+>>         shift right     ..     ..   ..   ..
+
+Abbreviations
+-------------
+  ppc          pseudo program counter
+  hp           header pointer
+  cpc          code program counter (i.e. real pc)
+
+IPS Emulator
+------------
+emu    hp = peek(ppc)  /* header pointer = @pseudo program counter        */
+       ppc+=2          /* ppc points to next word in program              */
+exec   cpc = peek(hp)  /* code pc = @header pointer, i.e. executable code */
+       hp+=2           /* hp points to next word in executing IPS word    */
+       jump (cpc)      /* execute code routine */
+       :
+ret    do i/o          /* keyboard, screen and file i/o */
+       do 20ms         /* clocks and stop watches       */
+       jump emu        /* around we go again            */
+
+
+IPS Code Words' Pseudocode
+--------------------------
+Note that all code returns to 'ret' except $TUE which returns to 'exec'.
+
+______________________________________________________________________________
+
+RUMPELSTILZCHEN          /* high level no-op */
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+DEFEX                    /* DEFinition EXecutive */
+    push_rs(ppc)         /* push return address to return stack*/
+    ppc = hp             /* jump to code at hp */
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+CONSEX                   /* CONStant EXecutive */
+    push_ps(peek(hp))    /* value is at hp; push to ps */
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+VAREX                    /* VARiable EXecutive */
+    push_ps(hp)          /* hp is address of variable; push to ps */
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+RETEX                    /* REturn EXecutive */
+    ppc = pull_rs        /* jump back to caller */
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+@                        /* Get word at addr on stack; place word on stack */
+    poke(ps,peek(peek(ps)))
+    jump ret             /* return to emulator */
+
+______________________________________________________________________________
+
+@B                       /* Get byte at addr on stack; place on stack */
+    poke(ps,peekB(peek(ps)))
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+!                        /* Put word on stack to address on stack */
+    a=pull_ps
+    v=pull_ps
+    poke(a,v)
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+!B                       /* Put byte on stack to address on stack */
+    a=pull_ps
+    v=pull_ps
+    pokeB(a,v)
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+1BLITERAL                /* Number executive, 1 byte */
+    push_ps(peekB(ppc))  /* get byte at ppc; push to ps */
+    ppc+=1               /* skip over literal's value */
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+2BLITERAL                /* Number executive, 2 byte */
+    push_ps(peek(ppc))   /* get word at ppc; push to ps */
+    ppc+=2               /* skip over literal's value */
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+BRONZ                    /* If ps = 0 jump to addr, else carry on */
+    IF (pull_ps AND #1) = 0 THEN
+     ppc=peek(ppc)       /* jump to address */
+    ELSE
+     ppc+=2              /* jump over address */
+    ENDIF
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+JUMP                     /* jump to address */
+    ppc=peek(ppc)
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+WEG                      /* Remove item from the stack */
+    ps+=2                /* adjust ps pointer */
+    jump ret             /* return to emulator */
+                         /* Note: stack addressing model may require ps-=2 */
+______________________________________________________________________________
+
+PWEG                     /* Remove 2 items from the stack */
+    ps+=4                /* adjust ps pointer */
+    jump ret             /* return to emulator */
+                         /* Note: stack addressing model may require ps-=4 */
+______________________________________________________________________________
+
++                        /* Add two numbers on the stack */
+    v=pull_ps            /* <n> <m>  --->  <n+m> */
+    poke(ps,peek(ps)+v)
+    jump ret             /* return to emulator   */
+______________________________________________________________________________
+
+-                        /* Subtract two numbers on the stack */
+    v=pull_ps            /* <n> <m>  --->  <n-m> */
+    poke(ps,peek(ps)-v)
+    jump ret             /* return to emulator   */
+______________________________________________________________________________
+
+DUP                      /* Duplicate item on stack */
+    push_ps(peek(ps))    /* <n>  --->  <n> <n> */
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+PDUP                     /* Duplicate 2 items on stack            */
+    push_ps(peek(ps+2))  /*   <n> <m>      --->  <n> <m> <n>      */
+    push_ps(peek(ps+2))  /*   <n> <m> <n>  --->  <n> <m> <n> <m>  */
+    jump ret             /* return to emulator */
+                         /* Note: stack addressing model may require ps-2 */
+______________________________________________________________________________
+
+VERT                     /* Swap two items on the stack */
+     {shuffle data in}   /*  <n> <m>  ---> <m> <n>     */
+     {place on stack }
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+ZWO                      /* Duplicate second stack item */
+    push_ps(peek(ps+2))  /*   <n> <m>      --->  <n> <m> <n>  */
+    jump ret             /* return to emulator */
+                         /* Note: stack addressing model may require ps-2 */
+______________________________________________________________________________
+
+RDU                      /* rotate three items on stack */
+    {shuffle data in}    /*   <c> <b> <a>  ---> <a> <c> <b> "bottom Up"  */
+    {place on stack }
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+RDO                      /* rotate three items on stack */
+    {shuffle data in}    /*   <c> <b> <a>  ---> <b> <a> <c> "top dOwn"  */
+    {place on stack }
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+I                        /* Copy top of return stack to parameter stack */
+    push_ps(peek(rs))
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+S>R                      /* Move item off parameter stack to return stack */
+    push_rs(pull_ps)
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+R>S                      /* Move item off return stack to parameter stack */
+    push_ps(pull_rs)
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+=0  <0  >0               /* Relational tests; values are signed */
+
+    v=peek(ps)
+    test v
+    IF <result true> THEN poke(ps,#1) ELSE poke(ps,#0)
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+F-VERGL                  /* field comparison */
+                         /* <addr1> <addr2> <bytes> F-VERGL */
+    n =pull_ps           /* number of bytes; 1-256 only */
+    a2=pull_ps           /* pull address of 2nd array */
+    a1=peek(ps)          /* read address of 1st array */
+    t=1                  /* initialise flag to "arrays are ="  */
+    REPEAT
+      b1=peekB(a1): a1+=1
+      b2=peekB(a2): a2+=1
+      IF b1>b2 THEN t=2
+      IF b1<b2 THEN t=0
+      n=(n-1)AND#FF      /* 1byte counter */
+    UNTIL n=0
+    poke(ps,t)
+    jump ret             /* return to emulator */
+______________________________________________________________________________
+
+>=U                     /* Great or equal, unsigned */
+    b=pull_ps
+    a=peek(ps)
+    IF a>=b THEN t=1 ELSE t=0
+    poke(ps,t)
+    jump ret            /* return to emulator */
+______________________________________________________________________________
+
+NICHT                   /* Invert word on stack */
+    poke(ps,NOT peek(ps))
+    jump ret            /* return to emulator */
+______________________________________________________________________________
+
+UND  ODER  EXO          /* Logical AND, OR, EXOR words on stack */
+
+    v=pull_ps           /* pull first value */
+    poke(ps,v OP peek(ps)) /* where OP = AND/OR/EXOR */
+    jump ret               /* return to emulator */
+______________________________________________________________________________
+
+BIT                    /* Set mask for bit of word specified */
+    b=peek(ps)         /* bit position, 0-15 */
+    poke(ps,#1 << b)   /* shift a "1" left b places */
+    jump ret           /* return to emulator */
+______________________________________________________________________________
+
+SBIT CBIT               /* Set/Clear bit of byte */
+                        /* e.g.<bit-no> <addr of byte> CBIT */
+    a=pull_ps           /* pull address of byte to modify */
+    b=(pull_ps)AND#7    /* bit position, 0-7 only */
+    v=peekB(a)          /* read byte at a */
+    b=#1 << b           /* shift a "1" left b places */
+    v=v OP b            /* SBIT = v OR b; CBIT = v AND NOT b
+    pokeB(ps,v)         /* replace byte
+    jump ret            /* return to emulator */
+______________________________________________________________________________
+
+TBIT                    /* Test bit of byte */
+                        /* <bit-no> <addr of byte> TBIT */
+    a=pull_ps           /* pull address of byte to test */
+    b=peek(ps)AND#7     /* bit position, 0-7 only */
+    v=peekB(a)          /* read byte at a */
+    b=#1 << b           /* shift left a "1", b places */
+    v=v AND b
+    IF v=0 THEN t=0 ELSE t=1
+    poke(ps,t)          /* result to the stack */
+    jump ret            /* return to emulator */
+______________________________________________________________________________
+
+$JEEX
+    ppc=peek(ppc)       /* in case loop is premature */
+    push_rs(pull_ps)    /* pull loop limit from PS and push to RS */
+    I=pull_ps           /* pull initial index from PS */
+    jump lpxj           /* for "end of loop" tests */
+
++LOOPEX
+    inc=pull_ps:        /* pull increment off PS */
+    jump lpxp
+
+LOOPEX
+    inc=1
+lpxp                    /* +loopex entry */
+    I=pull_rs:          /* pull index off RS */
+    I+=inc :            /* I is incremented index */
+lpxj                    /* $jeex entry
+    L=peek(rs):         /* read Limit on RS */
+    IF I<=L THEN        /* continue loop */
+      push_rs(I)        /* push new index onto RS */
+      ppc=peek(ppc):    /* Jump back */
+     ELSE               /* finished */
+      L=pull_rs:        /* discard L off RS  */
+      ppc+=2:           /* Jump forwards 1 word */
+    ENDIF
+    jump ret            /* return to emulator */
+
+And by way of example:
+
+  : LOOP JE  I @ 2 +NUN ;   compiles as (e.g.):
+
+  ADDRESS      DATA
+  ---------------------------------------
+  #1DA1        #5C04                             ]
+  #1DA3        #2389    5C 89 23 hash_name LOOP  ] Header
+  #1DA5        #1D55    #1D55 (prev defn. start) ]
+
+  #1DA7        #0F0D    DEFEX ( entry)
+  #1DA9        #0C47    $JEEX
+  #1DAB        #1DB5    ----------+
+  #1DAD    +-->#0CF6    I         |
+  #1DAF    |   #0B7C    @         |
+  #1DB1    |   #0FEE    2  kon    |
+  #1DB3    |   #0C2E   +LOOPEX    |
+  #1DB5    +-- #1DAD    <---------+
+  #1DB7        #0BD0    RETEX
+______________________________________________________________________________
+
+>>>                     /* Field Transport */
+                        /* <source addr> <dest addr> <n>  >>>  (1-256 bytes) */
+    n=pull_ps           /* number of bytes */
+    d=pull_ps           /* destination address */
+    s=pull_ps           /* source address */
+    REPEAT
+      b=peekB(s); s+=1  /* get byte; increment source address */
+      pokeB(d,b); d+=1  /* put byte to dest. addr.; increment address */
+      n=(n-1)AND#FF     /* 1 byte counter */
+    UNTIL n=0
+    jump ret           /* return to emulator */
+
+    /* Limiting cases:                        */
+
+    /*     n    copies    |    n    copies    */
+    /*  ------------------+-----------------  */
+    /*    -1    255       |    255    255     */
+    /*     0    256       |    256    256     */
+    /*     1      1       |    257      1 etc */
+______________________________________________________________________________
+
+CHS                    /* Change sign of number on the stack */
+    poke(ps,-peek(ps))
+    jump ret           /* return to emulator */
+______________________________________________________________________________
+
+$TUE                    /*  Execute code at <addr> */
+    hp = pull_ps
+    jump exec           /* return to execution part of emulator */
+______________________________________________________________________________
+
+$IPSETZEN               /* Reset keyboard input pointer */
+                        /* Takes a value off the stack, sets the keyboard */
+                        /* pointer to this, mod #400. Host will place     */
+                        /* cursor here.                                   */
+    input_ptr=pull_ps AND #3FF
+    jump ret           /* return to emulator */
+______________________________________________________________________________
+
+$PSHOLEN               /* returns the stack pointer */
+    push_ps(ps)
+    jump ret           /* return to emulator */
+
+  /* returns value at the time of call; puts on the stack, whereupon the ps */
+  /* pointer will change by one entry                                       */
+______________________________________________________________________________
+
+$PSSETZEN              /* takes a number off stack and sets sp to this number */
+    ps=pull_ps         /* but, make sure value is conformal with $SL */
+    jump ret           /* return to emulator */
+______________________________________________________________________________
+
+P+                     /* Add two 32-bit numbers  */
+    Bh=pull_ps         /* ms word B */
+    Bl=pull_ps         /* ls word B */
+    B = Bh << 16  + Bl /* combine ms and ls
+
+    Ah=pull_ps         /* ms word A */
+    Al=pull_ps         /* ls word A */
+    A = Ah << 16  + Al /* combine ms and ls
+
+    C = A + B          /* add them */
+
+    push_ps(C)         /* replace ls word result */
+    push_ps(C >> 16)   /* replace ms word result */
+    jump ret           /* return to emulator */
+______________________________________________________________________________
+
+P-                     /* Subtract two 32-bit numbers  */
+    Bh=pull_ps         /* ms word B */
+    Bl=pull_ps         /* ls word B */
+    B = Bh << 16  + Bl /* combine ms and ls
+
+    Ah=pull_ps         /* ms word A */
+    Al=pull_ps         /* ls word A */
+    A = Ah << 16  + Al /* combine ms and ls
+
+    C = A - B          /* subtract them */
+
+    push_ps(C)         /* replace ls word result */
+    push_ps(C >> 16)   /* replace ms word result */
+    jump ret           /* return to emulator */
+
+______________________________________________________________________________
+
+P*                     /* 16 x 16 unsigned multiply */
+    B=pull_ps
+    A=pull_ps
+
+    C=A*B              /* unsigned x unsigned -> 32 bit result  */
+
+    push_ps(C)         /* replace ls word result */
+    push_ps(C >> 16)   /* replace ms word result */
+    jump ret           /* return to emulator */
+______________________________________________________________________________
+
+P/MOD                  /* Divide a 32 bit positive word by a 16 bit positive */
+                       /* word; produce 16 bit quotient and 16 bit remainder */
+
+     D =pull_ps        /* 16 bit denominator, unsigned */
+     Nh=pull_ps
+     Nl=pull_ps
+     N = Nh << 16 + Nl /* 32 bit numerator unsigned */
+
+     IF D=0 THEN {Q=#FFFF ; R=0 ; jump exit}  /* trap if DIV needs it */
+
+     Q = N DIV D       /* 32 bit quotient unsigned  */
+     R = N MOD D       /* 16 bit remainder unsigned */
+
+     IF (Q >=#10000 THEN Q=#FFFF; R=0
+
+exit push_ps(Q)
+     push_ps(R)
+     jump ret           /* return to emulator */
+
+Note: some implementations also return R=#FFFF on overflow.
+______________________________________________________________________________
+
+$POLYNAME               /* name hasher */
+     D=pull_ps          /* character   */
+   0.C=pull_ps          /* hashed name; initially #008D */
+   B.A=pull_ps          /* hashed name; initially #CE57, i.e. B=#CE, A=#57 */
+
+     X=[0.A.B.C]        /* combine into 32 bit word; initially #0057CE8D */
+     P=D EXOR X EXOR X>>1 EXOR X>>2 EXOR X>>7
+     X=X EXOR P<<24
+     X=X>>7
+     push_ps( B.A )     /* split up X as per above and put    */
+     push_ps( 0.C )     /* to stack in same order as on entry */
+     jump ret           /* return to emulator */
+______________________________________________________________________________
+
+CYC2                    /* AMSAT crcc calculation */
+
+     ch =pull_ps        /* byte to be processed */
+     A.B=pull_ps        /* get seed .. */
+     crcc=B.A           /* .. and swap bytes */
+
+     ch=ch << 8         /* align character with crcc */
+     FOR loop=0 TO 7
+       test = (ch EXOR crcc) AND #8000 /* compare ms bits */
+       crcc = crcc << 1   /* shift both left 1 place */
+       ch   =   ch << 1
+       IF test<>0 THEN crcc = crcc EXOR #1021
+     NEXT
+
+     B.A=crcc           /* swap bytes of crcc and .. */
+     push_ps(A.B )      /* .. return result */
+     jump ret           /* return to emulator */
+
+     /* byte swapping not needed if stack storage is big endian */
+______________________________________________________________________________
+
+TR-LOOP                 /* Theta-rotate core */
+
+    /* Input:   theta,  X, Y, 0                                             */
+    /* Output:  0,  k*R*Cos(theta + Atn<Y/X>),  k*R*Sin(theta + Atn<Y/X>)   */
+
+RP-LOOP                 /* Rectangular > Polar core */
+
+    /* Input:   theta0, X, Y, 0                                             */
+    /* Output:  (theta0 + Atn<Y/X>), k*R, 0                                 */
+    /*                                                                      */
+    /*          where k=1.646,  R=SQR(X*X+Y*Y)  and X >= 0                  */
+
+    /* Typically these calculations are performed by the Volder's 'Cordic'  */
+    /* pseudo-multiplication method.  In an implementation using a high     */
+    /* level language such as C, Pascal or BASIC, use the native trig       */
+    /* functions as indicated above.                                        */
+______________________________________________________________________________
+
+3V3                     /* Swap two triples on the stack */
+                        /* On entry:   < A B C   D E F >
+                        /* On exit:    < D E F   A B C >
+
+    {shuffle 6 words in place on stack as indicated}
+    jump ret            /* return to emulator */
+______________________________________________________________________________
+
+$OSCLICODE              /* Operating System Command Line Interpreter */
+
+Interface to native OS.  Two numbers on stack point to start and
+end of text string which is the command to be executed.  Returns 1 on
+the stack if successful, otherwise returns 0.
+______________________________________________________________________________
+
+$OPENFILE              /* Opens file for reading as IPS commands */
+
+Interface to native file handling system.  Two numbers on stack point to start
+and end of text string which is the name of the file to be processed.  Returns
+1 on the stack if successful, otherwise returns 0.
+______________________________________________________________________________
+
+$CLOSEFILE             /* Terminate file handling operation */
+
+Interface to native file handling system, called whenever opened file
+need to be closed.  Takes no parameters, and returns none.
+______________________________________________________________________________
+
+$SAVECODE              /* Save an area of IPS memory to file */
+
+Interface to native file handling system.  Two numbers on stack define area
+to be dumped.  Next two numbers in stack point to start and end of text string
+which is the name of the file to be used for output.  Returns 1 on the stack
+if successful, otherwise returns 0.
+______________________________________________________________________________
+
+$LOADCODE              /* Load a file to IPS memory */
+
+Interface to native file handling system. Number on stack defines where file
+contents are to be placed.   Next two numbers in stack point to start and end
+of text string which is the name of the file to be loaded.  Returns 1 on the
+stack if successful, otherwise returns 0.
+______________________________________________________________________________
+
+
+<end>

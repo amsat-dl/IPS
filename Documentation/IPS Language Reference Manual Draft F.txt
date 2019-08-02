@@ -1,0 +1,763 @@
+IPS Language Reference Manual
+AMSAT s/w group UK
+Generic IPS specification
+Author:
+R.A.Gape	Software Group UK
+
+Issue
+Draft A	8 February 1983
+Draft B	26 April 1983, new sections and minor amendments
+Draft C	17th July 1984, minor amendments
+Draft D	11th June 1995, scanned to Word 6 format.  W.Roth
+Draft E 15 Feb 1996 Corrections and additions.     J.R.Miller
+Draft F 18 Jul 2003 ICHN Correction                P.C.L. Willmott
+
+Circulation:
+	J. Rabson	Software Group UK
+	C. Trayner	Software Group UK
+	K. Meinzer	AMSAT-DL
+
+			This document is not complete
+			      Comments welcome
+
+				 Contents
+
+	Format For Operator Descriptions...........................1
+	IPS Stacks.................................................2
+	Arithmetic Operators.......................................2
+	Logical Operators..........................................3
+	Parameter Stack Manipulation Operators.....................4
+	Fetch and Store Operators..................................5
+	Return Stack Operators.....................................6
+	Relational Operators.......................................6
+	Control Constructs.........................................8
+	Field Operations...........................................9
+	Clocks and Stopwatches.....................................9
+	File ( cassette ) I/O.....................................10
+	Program Definition........................................11
+	CODE Definition...........................................11
+	New Data Definition Types.................................12
+	Program Definition Support................................13
+
+Note: Page 3 of the original document is missing.
+
+Format For Operator Descriptions:		Example:	
+
+OPERATOR	operator description	+	Adds 2 2s complement words
+		operator and parameter usage	<n> <m> +
+		stack result			<n+m>
+
+As coded:
+12 24 +
+Leaves 36 on the parameter stack as in FORTH.
+
+
+
+
+
+IPS Stacks:
+
+IPS maintains 2 stacks, a parameter stack and a return stack. Both of these
+deal with 2 byte ( 16 bit ) words. The parameter stack is used for general
+data manipulation. The return stack is used to keep routine return
+addresses, and also to provide a numerically controlled looping facility.
+In most IPS applications these stacks are not directly manipulated by the
+programmer, although their contents are. The IPS assemblers provide
+machine level access if required. Items on the stack are 16 bit 2s
+complement words.  Any other interpretation is the programmer's responsibility.
+However IPS does provide some in-built definitions that operate on 2s
+complement words considered to be:
+
+  a) 2s complement byte. The least significant byte of the stack entry.
+  
+  b) 16 bit positive number.  All the bits of the stack entry, with the value
+     #FFFF taken as the maximum positive integer.
+
+
+
+Number Entry:
+
+Numbers may be specified in decimal, hexadecimal or binary format.
+                                     
+   Format     Examples                  
+   ------------------------------------------------
+   Decimal    0  1   42   -365   12345  -12345 
+                                        
+   Hex        #1    #3A    #123   #1EFF             
+                                 
+   Binary     B1   B01  B101010  B1111000011110000       
+
+Entered numbers are converted modulo #FFFF.
+
+Number Display:
+
+Computers running IPS may have a display of computed results.  The numbers
+are read from the parameter stack, and may be presented in hex or decimal.
+The display number base can be selected with the words:
+
+	n BASIS !       where n=10 for decimal, and any other value (e.g. 16)
+			for hexadecimal.
+
+Text Entry:
+
+Example:
+" Arbitrary text string not containing quote "   1 - 256 characters
+
+Inside a definition:	at execution time text will be written to the screen
+			at a position given by the screen pointer variable SP
+
+Outside a definition: 	leaves on the stack the address of the first character
+			and the length of the string.  Use with  !T - see Fetch
+			and Store operations. 
+			" This is text "
+			<addr> <n>
+
+
+
+
+Arithmetic Operators:
+
++	Adds 2 2s complement words.
+	<n> <m> +
+	<n+m>
+
+-	Subtracts 2 2s complement words.
+	<n> <m> -
+	<n-m>
+
+P*	Multiplies 2 16 bit positive words, result is their 32 bit product.
+	<n> <m> P*
+	<n * m, least sig. 16 bits> <n * m, most sig 16 bits>
+
+*	Multiplies 2 16 bit positive words, result is 16 least
+	significant bits of their product.
+	<n> <m> *
+	<n * m, least sig. 16 bits>
+
+P/MOD	Divides a 32 bit positive word by a 16 bit positive word,
+	produces 16 bit quotient and 16 bit remainder.
+	If the quotient overflows it is set to #FFFF.
+	<n, least sig. 16 bits> <n, most sig. 16 bits> <m> P/MOD
+	<quotient n/m> <remainder n/m>
+
+P/	As P/MOD but returns most significant word only       ( IPS-C )
+	<n, least sig. 16 bits> <n, most sig. 16 bits> <m> P/
+	<quotient n/m>
+
+/MOD	Divides 2 16 bit positive words, produces quotient and remainder.
+	<n> <m> /MOD
+	<quotient n/m> <remainder n/m>
+
+/	Divides 2 16 bit Positive words.
+	<n> <m> /
+	<quotient n/m>
+
+MOD    Remainders 2 16 bit positive words.
+	<n> <m> MOD
+	<remainder n/m>
+
+
+
+Logical Operators:
+
+NICHT	Inverts all bits.
+	<bbbbbbbbbbbbbbbb> NICHT
+	<b*b*b*b*b*b*b*b*b*b*b*b*b*b*b*b*>
+	 (b* = complement of b )
+
+UND    Logically ANDs all bits.
+	<n> <m> UND
+	<n AND m, bitwise>
+
+ODER	Logically ORs all bits.
+	<n> <m> ODER
+	<n OR m, bitwise>
+
+EXO	Logically EXCLUSIVE OR all bits.
+	<n> <m> EXO
+	<n exclusive-OR m, bitwise>
+
+BIT	Set mask for bit of word specified.  Mask is all zeroes
+	with bit specified set to 1.                        ( Not IPS-C )
+	<n> BIT
+	<mask, only 1 bit set to 1>
+
+CBIT    IPS-C only.  Clear bit of byte.
+	<bit-no> <addr of byte> CBIT
+	Bit specified set to 0, all other bits unaffected.
+
+SBIT	IPS-C only.  Set bit of byte.
+	<bit-no> <addr of byte> SBIT
+	Bit specified set to 1, all other bits unaffected.
+
+TBIT	IPS-C only.  Test bit of byte.
+	<bit-no> <addr of byte> TBIT
+	<result>
+	Result is 1 if bit specified is 1, 0 if bit specified is 0.
+
+
+Parameter Stack Manipulation Operators:
+
+DUP    Duplicate stack.
+	<n> DUP
+	<n> <n>
+
+PDUP	Duplicates 2 stack entries.
+	<n> <m> PDUP
+	<n> <m> <n> <m>
+
+VERT	Swap top 2 entries.
+	<n> <m> VERT
+	<m> <n>
+
+WEG	Destroy top entry.
+	<m> <n> WEG
+	<m>
+
+PWEG	Destroy 2 entries.
+	<m> <n> PWEG
+	empty
+
+ZWO	Duplicate 2nd entry.
+	<n> <m> ZWO
+	<n> <m> <n>
+
+RDU      Rotates 3 entries.
+	<a> <b> <c> RDU
+	<c> <a> <b>
+
+RDO      Rotates 3 entries.
+	<a> <b> <c> RDO
+	<b> <c> <a>
+
+
+Fetch and Store Operators:
+
+@	Get word
+	<addr> @
+	<contents of addr>
+
+@B	Get Byte
+	<addr> @B
+	<byte at addr, most significant byte = 0>
+
+!	Store word
+	<n> <addr> !
+	empty.  Word at addr now contains value n.
+
+!B	Store byte
+	<n> <addr> !B
+	empty.  Byte at addr now contains least significant 8 bits of n.
+	Only 1 byte is affected.
+
+!T	Store text ( outside a definition !!! )
+	<start-of-string> <length> <addr> !T
+	empty.  String specified is stored at addr.  Length is in bytes.
+	Usually used with quoted text.
+
+
+SCHREIB	Stores text at SP, updates SP
+	<start-of-string> <length> SCHREIB
+	empty.  String specified is written ( stored ) at SP. Length is in bytes.
+
+!FK	Store field components
+	<n1> <n2> <n3> ... <nm> <addr> <m> !FK
+	empty.  Words on stack are stored at addr starting with nl, then n2 etc.
+	N.B. whole words are stored, the number of bytes affected is 2m.
+
+!CHAR	Store character
+	<char> !CHAR
+	empty.  Stores char as a byte at SP, increments SP.
+
+?	Get address of constant's parameter field
+	? NAME 
+	<address-of-NAME>
+
++! 	Modify contents of address. ( IPS-R, W )
+	<n> <addr> +!
+	Word at addr now contains ( previous value + n ).
+
+
+INCR	Increment contents of address
+	<addr> INCR
+	empty.  Word at addr is incremented by 1.
+
+
+
+Return Stack Operators:
+
+I	Copies top of return stack to parameter stack.
+	I
+	<top of return stack>
+
+
+S>R	Moves parameter stack to return stack.
+	<n> S>R
+	empty. <n> is now top of return stack.
+
+R>S	Moves one word from return stack to parameter stack.
+	R>S <top of return stack>.  Top is lost from return stack.
+
+
+Relational Operators:
+
+These operators return a value with bit 0 set to 1 ( TRUE ) if the condition is
+satisfied, otherwise a value with bit 0 set to 0. (FALSE). Operands are
+treated as signed quantities.
+
+=	Tests for equality.
+	<n> <m> =
+	<TRUE if n=m>
+
+<>	Tests for inequality.
+	<n> <m> <> 
+	<FALSE if n=m>
+
+>	Tests for greater than.
+	<n> <m> >
+	<TRUE if n>m>
+
+<	Tests for less than.
+	<n> <m> < 
+	<TRUE if n<m>
+
+>=	Tests for greater than or equal to.
+	<n> <m> >= 
+	<TRUE if n>=m>
+
+<=	Tests for less than or equal to.
+	<n> <m> <=
+	<TRUE if n<=m>
+
+
+Relational Operators (continued):
+
+=0	Tests for zero.
+	<n> =0
+	<TRUE if n=O>
+
+<>0	Tests for not zero.            ( Not IPS-C )
+	<n> <>0
+	<FALSE if n=0>
+
+>0	Tests for greater than zero.
+	<n> >0
+	<TRUE if n>0>
+
+<0	Tests for less than zero.
+	<n> <0
+	<TRUE if n<0>
+
+>=U	Unsigned test.                ( Not IPS-C )
+	<n> <m>
+	<TRUE if n>=m, as unsigned 16 bit numbers>
+
+F-VERGL	Field comparison.
+	<a> <b> <n> F-VERGL
+	<result>.
+	This instruction compares n pairs of bytes starting at locations a and b.
+	If equal, result is 1. If bytes in a are numerically greater than in b,
+	result is 2, else 0. Higher addressed bytes are treated as more significant.
+
+
+Control Constructs:
+
+JA? NEIN: DANN
+	If statement, with (optional) else clause.
+	<conditional> JA?
+			   <true actions>
+			NEIN:
+			   <false actions>
+			DANN
+
+	<conditional> JA?
+	  	<true actions>
+			DANN
+JE NUN
+	Iteration loop, with test at end of loop, and optional non unity
+	increments.
+	The value of the loop index is available by use of the word I.
+	( !N.B. This construct uses the return stack!)
+		<a> <b> JE
+			 <iterated actions>
+			NUN
+	Index starts set to a and increments by 1 until
+	the index is equal to or greater than b.
+		<a> <b> JE
+			   <iterated actions>
+			<m> +NUN
+	Index starts set to a and takes an increment off the stack each time
+	through the loop until the index is equal to or greater than b.
+
+
+ANFANG ENDE?
+	Conditional loop, with test at end.
+	ANFANG
+	  <iterated actions>
+	<conditional> ENDE?
+	The loop is performed until the conditional is TRUE.
+	Each time through the loop a value is removed from the stack when the
+	conditional test is performed.
+
+ANFANG JA?  DANN/NOCHMAL
+	Conditional loop, with test at start.
+	ANFANG
+	<conditional> JA?
+	  <iterated actions>
+	DANN/NOCHMAL
+	The loop is performed while the conditional is TRUE.
+	Each time through the loop a value is removed from the stack when the
+	conditional test is performed.
+
+
+Field Operations:
+
+>>>	Field transport
+	<source-addr> <dest-addr> <n> >>>
+	empty.  Copies n bytes from source-addr to dest-addr.
+	1<= n <= 256.  Lowest address is copied first.
+
+L>>>	Long field transport
+	<source-addr> <dest-addr> <n> L>>>
+	empty.  Copies n bytes from source-addr to dest-addr. n < 32768.
+	Lowest address is copied first.
+
+TRANSPORT
+	Copies data to output buffer
+	<addr> TRANSPORT
+	empty.  Copies 512 bytes from addr to $BU. ( $EBU in the case of IPS-C )
+
+Clocks and stopwatches:
+
+UHR	A six byte field.  Every 20ms or so it is updated to provide the real time.
+	Some IPS implementations gain or lose 20ms periodically to compensate
+	for a non-20ms timer.
+
+	BYTE	contents
+	0	10ms units ( incremented by 2 )
+	1	seconds 0-59
+	2	minutes 0-59
+	3	hours ( 0-23 )
+	4	} LSB days ( 0-#FFFF)
+	5	} MSB
+
+All versions of IPS have this format.  In IPS-C and its support packages
+the AMSAT day number is used by convention.  (Day 0 = 1978 Jan 01)
+
+SUn    IPS provides 4 stopwatches, numbered 0-3.  These are addressable
+	  by using the fields SU0, SU1, SU2 and SU3. ( 4 bytes wide. )
+
+	BYTE	contents
+	0	l0ms units ( decremented by 2 ). If this byte is set to 1 (odd)
+		the stopwatch has expired or is paused.  The watch is started
+		by setting
+		this byte to some even value.
+	1	seconds       ( 0-59 )    decrementing
+	2	} LSB minutes ( 0-32767 ) decrementing
+	3	} MSB
+
+N.B. IPS-C has a different SU3 allocation; do not use.
+
+
+
+File (cassette) I/O:
+
+A set of flags and operators allow IPS to perform I/O using 1input device
+and 1 output device, usually a pair of  cassette recorders.
+
+All data manipulation is in terms of n*256 byte blocks. ( Usually 512 byte,
+except for load blocks.) A 512 byte (1 block) buffer $BU is provided to hold
+data to be recorded.
+
+The input mechanism does not apply to IPS-C.
+IPS-C uses $EBU as the output buffer.
+
+Output:
+
+AUFNAHME	Outputs 512 data bytes from field $BU. in the case of
+	cassette/data I/O this is prefixed by a leader and synch vector and
+	followed by a checksum and trailer.
+
+C/Z	One byte flag, set non-zero when the recording
+	mechanism is still active.
+
+Input:
+
+LESEN	Inputs 512 data bytes to field $BU. Uses $LOAD and flags as below.
+
+$LOAD	Inputs 1 or more blocks.  Start and limit address
+	( = final address + 1 ) of the load buffer are specified.
+	The buffer length must be an integral number of 256 byte blocks.
+	<start-address> <limit-address> $LOAD
+	empty .
+
+LADEFLAGGE	One byte flag, set to one when the loading process is still active,
+		set to zero when inactive.
+
+TEXTLESEN	One byte flag, when set to 1 the compiler will attempt
+		to process input. when set to 0, the compiler is inhibited.
+
+
+Definitions:
+IPS provides several types of Definitions, and the capability to define new types.
+
+Program definition:
+
+A program definition is a string of IPS words enclosed in a pair of colon
+semi-colon brackets.  The definition name immediately follows the colon.
+There are four types of program definition, differentiated by the type of colon
+as noted below:
+
+:	Executed at run time when invoked within another definition,
+	invoked at compile time outside a definition.
+
+:PRIOR	Executed at compile time when invoked within another
+	definition, not valid outside a definition.
+
+:HPRI	Executed at compile time both within and without a definition.
+
+:INT	Executed at compile time without a definition, not valid within a definition.
+
+;	Terminates a definition, of any sort.
+
+	: <name> <word> .... <word> ;
+
+CODE definition:
+
+A code definition is a string of IPS assembler words introduced by the word CODE.
+The logical exit from the definition is marked by the word NEXT, which returns
+control to the emulator. N.B. unlike a program definition which is closed with a
+<semi-colon> the CODE definition merely marks an entry point to a code routine
+from the emulator.  No formal close of the routine is necessary.
+
+	CODE <assembler-words>
+
+Note also that assemblers are machine specific, and are not frequently required
+by the IPS application programmer.
+If you must use them it's your look-out!
+
+Data definition:
+IPS provides 3 in-built classes of definition to handle values.
+These are constant, variable, and field.
+
+KON	Defines a name to have a 16 bit value.
+	<value> KON <name>
+	<empty>
+	When <name> is invoked <value> is placed on the stack.
+
+VAR	Defines the address of a 16 bit variable, and the initial contents.
+	<value> VAR <name>
+	<empty>
+	When <name> is invoked <address of-variable> is placed on the stack.
+	@ and ! may be used to recover and store the variable's value.
+
+FELD	Defines a data area, but not its contents.
+	<length> FELD <name>
+	<empty>
+	Reserves a contiguous data area of <length> bytes.  When <name>
+	is invoked <address of start of data area> is placed on the stack.
+	The start is the lowest address of the reserved area.
+
+Deleting Definitions:
+
+WEG/AB	Deletes all words after and including the one specified
+	WEG/AB <name>
+	empty.   You cannot delete words that are a part of IPS itself
+
+
+New Data Definition Types:
+
+A mechanism exists to specify the compile time and execution time actions
+to be associated with a new class type. This new class type may be used
+subsequently to generate new data definitions.
+
+: <type-name> ERZ> <word> ... <word> MACHT> <word, ... <word> ;
+
+ERZ>	Follows the new class name and introduces the compile
+	time actions required.  At compile time $H will be pointing to the
+	new definition's parameter field. Therefore deposits may be
+	made directly into the parameter field.
+
+MACHT>	Follows the compile time actions and introduces the list of
+	execution time actions required, as if MACHT> were a colon ( : ).
+	This list is terminated by the semi-colon ( ; ).
+
+MACHT/CODE>
+	As MACHT> above, but the actions are specified using
+	assembler instructions, as if MACHT/CODE>
+	were introducing a code routine.
+
+Having defined both the compile-time and run-time actions of members
+of the class <type-name> new data objects can be generated.  The name
+of the new definition must follow the class name.
+
+	<type-name> <name>
+
+	The stack entries required to define <name> successfully and the
+	contents of the stack after the definition are completely defined by
+	the particular <type-name> definition.
+
+At execution time the address of the entry's parameter field is first placed
+on the stack, and then the words folloing ERZ> are executed.
+
+New Data Definition Types Example:
+
+A new type TOC is defined, which has a value associated with it
+(in this case a character value ) and a run time action of calling OC which
+is assumed to be a predefined routine which transmits a byte on the stack.
+
+	: TOC
+	ERZ>
+	, ( deposit byte from stack )
+	MACHT>
+	@B ( get byte from parameter field )
+	OC ( transmit byte from stack )
+	; ( end of TOC )
+	~
+	#20 TOC SPACE ( Defines SPACE such that when invoked it
+	automatically transmits the value #20 )
+	~
+	SPACE ( #20 transmitted at this point )
+	~
+
+
+
+Program Definition Support:
+
+Compilation brackets are provided to go to and from compile mode in the
+middle of a program definition.
+
+I>	Switch to interpret mode from compile mode.  ( Not IPS-C )
+
+<I	Return to compile mode from interpret mode.  ( Not IPS-C )
+
+
+Program Definition Example:
+
+A numeric value is directly computed in the middle of a definition.
+For speed, it is computed once at compile time, rather than every time at
+execution time.  The value will not change during program execution.
+
+
+	: Fred
+	~
+	~
+	I>
+	13 linesize * display_base + (compute position)
+	$DEP (store value)
+	<I
+	~
+	~
+	~
+	; (Fred)
+
+
+Display:
+
+Material is written to the computer screen at a position given by the
+variable SP.  The following utilities aid composition.
+
+LEERZ	Writes n blanks starting at SP.  SP is not modified.
+	<n> LEERZ
+	empty
+
+SCHREIB	Stores text at SP, updates SP
+	<start-of-string> <length> SCHREIB
+	empty.
+
+WAND	Takes a number off the stack, converts it to a string and writes
+	it at SP.  Updates SP.  Conversion format determined by the variable
+	BASIS, which may be 10 or 16.
+	<n> WAND
+	empty
+
+
+Limited Input Mode:
+
+A program can be protected from inadvertent abuse by setting the limited
+input mode.  This allows access only to certain definitions, which must at the
+end of the program.  Numbers will not be accepted unless the program requires
+them.
+
+BEA	Define limit of access to words
+	' <name> BEA !
+	empty.   <name> is the first word that will be accepted.
+
+BEM	Set limited input mode
+	1 BEM !
+	empty.  Sets limited input mode.  RUMPELSTILZCHEN restores normal.
+
+Z-LESEN	Request a number input
+	1 Z-LESEN !
+	empty.  Computer now expects a number to be entered.  The number is
+		placed in the variable EINGABEZAHL.  Z-LESEN is reset. 
+
+Multi-task chain:
+
+Program definitions can be called in round-table fashion by enjoining them
+on the chain.  The compiler and screen generator are already on the chain, and
+cannot be de-chained.
+
+EINH	Enchain a definition.
+	<n> EINH <name>
+	empty.   n must be 0 to 7.  If a chain position is already occupied,
+	the new name in installed in its place.
+
+AUSH	Remove a definition from the chain sequencer.
+	<n> AUSH
+	empty
+
+Miscellaneous words:
+
+HIER	Returns the next free address in memory
+	HIER
+	<address>
+
+RUMPELSTILZCHEN  This is a code definition equivalent to a no-op.
+
+
+German - English Translations:
+
+There exist German and English versions of IPS.  The correspondence between
+words is as follows.  (Only differences are listed).
+
+
+Operators and Control:
+!FK           !FC                 JA?     YES?             RDU      RTU
++NUN          +NOW                JE      EACH             SUn      SWn     
+ANFANG        LBEGIN              KON     CON              UND      AND     
+DANN          THEN                NEIN:   NO:              UHR      CLOCK   
+DANN/NOCHMAL  THEN/REPEAT         NICHT   INV              VERT     SWAP    
+ENDE?         LEND?               NUN     NOW              WEG      DEL     
+EXO           XOR                 ODER    OR               WEG/AB   DEL/FROM
+F-VERGL       F-COMP              PWEG    PDEL             ZWO      SOT     
+FELD          FIELD               RDO     RTD        
+
+New Data Definition Types:             Limited Input:                 
+ERZ>                BECOME>            BEA                 LIS
+MACHT>              MAKE>              BEM                 LIM
+MACHT/CODE>         MAKE/CODE>         EINGABEZAHL         N-INPUT
+                                       Z-LESEN             N-READ
+Others:                                                               
+AUSH                DCHN               Output:
+EINH                ICHN               AUFNAHME            RECORD
+HIER                HERE                                              
+RUMPELSTILZCHEN      --                Input:                         
+                                       LESEN               READ
+Display:                               LADEFLAGGE          LOADFLAG
+BASIS               BASE               TEXTLESEN           TEXTREAD
+LEERZ               BLANKS
+SCHREIB             WRITE
+WAND                CONV
+
+Error Messages:
+--------------
+SPEICHER VOLL !        MEMORY FULL !
+NAME FEHLT !           NAME MISSING !
+STAPEL LEER !          STACK EMPTY !
+STRUKTURFEHLER !       STRUCT. ERROR !
+TEXTFEHLER !           TEXT ERROR
+UNZUL. NAME !          DUPLICATE NAME !
+
+
+End of document
