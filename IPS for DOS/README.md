@@ -4,5 +4,7 @@ An IPS emulator system called IPSDOS is available for the PC in English and Germ
 This was designed to run under pure DOS, and provides facilities for direct access to I/O and communication ports. 
 IPSDOS can run in a window under Windows 9x and Windows NT/2000/XP. Full documentation and source code in Pascal are provided.
 
+This is classic 16-bit IPS implementation.
+
 written by Paul Willmott, VP9MU. 
 
