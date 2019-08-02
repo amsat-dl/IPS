@@ -1,0 +1,118 @@
+.emulator    ; IPS Intepreter
+             ; --------------
+             ; "Inner interpreter", p33. See also p68-71 etc.
+
+             LDRB    HP,[PPC],#1        ; lsb     read @ PPC  PPC+=1
+             LDRB    r0,[PPC],#1        ; msb                 PPC+=1
+             ADD     HP,HP,r0,LSL#8     ; HP = lsb + msb*256; IPS address
+             ADD     HP,HP,MEM          ; convert HP to physical address
+             
+.exec        LDRB    r1,[HP],#1         ; lsb     read @ HP   HP+=1
+             LDRB    r0,[HP],#1         ; msb                 HP+=1
+             ADD     r0,r1,r0,LSL#8     ; Code =  lsb + msb*256; IPS address
+
+             CMP     r0,#(return-table)/4
+             ADDCC   PC,PC,r0,LSL#2     ; Computed jump into despatch table.
+             B       return             ; no-op
+             
+         ; ARM Note:  The no-op is *never* taken as HP always points to a code
+         ; routine within the table.  A no-op is *essential* padding though,
+         ; because PC is always 8 bytes ahead due to pipelining.  Could also use
+         ; MOV R0,R0, but B return is "safer" whilst hacking in case [HP] isn't
+         ; in the table.  With B return, If IPS gets corrupted, IPS will at
+         ; worst stiff, but the computer as a whole won't crash.  Usually ...
+           
+            ; Despatch table for ARM code routines; index in r0
+            ;
+.table      ;   routine         code  word             instr
+            ;---------------------------------------------------
+             B  return         ; &00  RUMPELSTILZCHEN    0
+             B  defex          ; &01  DEFEX              6
+             B  consex         ; &02  CONSEX             5
+             B  varex          ; &03  VAREX              5
+             B  retex          ; &04  RETEX              5
+             B  get            ; &05  @                  8
+             B  getB           ; &06  @B                 8
+             B  put            ; &07  !                  8
+             B  putB           ; &08  !B                 6
+             B  blit_1         ; &09  1BLITERAL          5
+             B  blit_2         ; &0A  2BLITERAL          5
+             B  bronz          ; &0B  BRONZ              4 (7)
+             B  jump           ; &0C  JUMP               5
+             B  weg            ; &0D  WEG                2
+             B  pweg           ; &0E  PWEG               2
+             B  plus           ; &0F  +                 10
+             B  minus          ; &10  -                 10
+             B  dup            ; &11  DUP                5
+             B  pdup           ; &12  PDUP               9
+             B  vert           ; &13  VERT               9
+             B  zwo            ; &14  ZWO                9
+             B  rdu            ; &15  RDU               13
+             B  rdo            ; &16  RDO               13
+             B  index          ; &17  I                  5
+             B  s_to_r         ; &18  S>R                5
+             B  r_to_s         ; &19  R>S                5
+             B  eqz            ; &1A  =0                 8
+             B  gz             ; &1B  >0                 7
+             B  lz             ; &1C  <0                10
+             B  geu            ; &1D  >=U               10
+             B  f_vergl        ; &1E  F-VERGL           14+8n
+             B  nicht          ; &1F  NICHT              8
+             B  und            ; &20  UND                9
+             B  oder           ; &21  ODER              10
+             B  exo            ; &22  EXO                9
+             B  bit            ; &23  BIT                7
+             B  cbit           ; &24  CBIT              11
+             B  sbit           ; &25  SBIT              11
+             B  tbit           ; &26  TBIT              14
+             B  jeex           ; &27  $JEEX             14
+             B  loopex         ; &28  LOOPEX            18
+             B  plusloopex     ; &29  +LOOPEX           22
+             B  field_trans    ; &2A  >>>               10+5n
+             B  pmul           ; &2B  P*                19+5n
+             B  pdiv           ; &2C  P/MOD            116
+             B  tue            ; &2D  $TUE               5
+             B  _polyname      ; &2E  $POLYNAME         20
+             B  _scode         ; &2F  $SCODE            24+13n
+             B  _cscan         ; &30  $CSCAN
+             B  chs            ; &31  CHS                8
+             B  cyc2           ; &32  CYC2              66
+             B  close          ; &33  $CLOSEFILE
+             B  open           ; &34  $OPENFILE
+             B  oscli          ; &35  $OSCLICODE
+             B  load           ; &36  $LOADCODE
+             B  save           ; &37  $SAVECODE
+             B  setkbptr       ; &38  $IPSETZEN          8
+             B  getPS          ; &39  $PSHOLEN           5
+             B  setPS          ; &3A  $PSSETZEN          5
+             B  rp_code        ; &3B  RP-LOOP          181
+             B  tr_code        ; &3C  TR-LOOP          181
+             B  swap3          ; &3D  3V3               39
+             B  defchar        ; &3E  $DEFCHARCODE
+             B  pplus          ; &3F  P+                22
+             B  pminus         ; &40  P-                24
+
+.return    ; All code routines jump back to here, except $TUE which
+           ; returns to .exec
+           ; -----------------------------------------------------------------
+             ADDS    LOOP,LOOP,#1<<(32-10)  ; Don't call "20ms" stuff too often
+             BCC     emulator               ; every 1024th emulator loop is
+                                            ; enough (5ms on A3010)
+                                       
+           ; (pseudo-interrupt)
+           ; ------------------
+             BL      uhr               ; update time/stopwatches  (if need be)
+             BL      ipptrcheck        ; block is ready to be processed ?
+             BL      keyb              ; service keyboard         (if any)
+             BL      file_in           ; service file input       (if any)
+             BL      escape            ; check for Escape pressed (if any)
+             
+             B       return            ; end of "20ms" routines
+
+           ; end of "inner interpreter" stuff
+           
+
+James Miller
+1997 Jul 28 [Mon] 1323 utc
+2001 Jun 16 [Sat] 2324 utc updated
+<end>
