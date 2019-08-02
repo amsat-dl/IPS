@@ -1,4 +1,4 @@
 # IPS for Linux
 
-This is the IPS 32-bit version for Linux
+classic 16-bit IPS implementations in Linux.
 
