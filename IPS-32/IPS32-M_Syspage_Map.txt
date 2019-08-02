@@ -1,0 +1,138 @@
+------------------------------
+IPS32-M Fixed Memory Addresses
+------------------------------
+
+000 - 3FF TV Screen
+
+Syspage assignments 400-47F
+---------------------------
+400  ' COMPILER
+401
+402
+403
+404  0 ' ZEIG-STAPEL (KETTE)
+405
+406
+407
+408  1                               
+409                                  
+40A
+40B
+40C  2
+40D
+40E
+40F
+410  3
+411
+412
+413
+414  4
+415
+416
+417
+418  5                               
+419                                  
+41A
+41B
+41C  6
+41D
+41E
+41F
+420  7
+421
+422
+423
+424  JUMP
+425
+426
+427
+428  #00000400
+429
+42A
+42B
+42C  READYFLAG
+42D  
+42E  
+42F  
+430  $PE value
+431
+432
+433
+434  $PI value
+435
+436
+437
+438  $P2 value
+439
+43A
+43B
+43C  *UNUSED*
+43D  *UNUSED*
+43E  *UNUSED*
+43F  *UNUSED*
+440  DVFLAG
+441
+442
+443
+444  LOADFLAG
+445  
+446  
+447  
+448  UHR 10ms    (0-98)
+449  UHR Seconds (0-59)
+44A  UHR Minutes (0-59)
+44B  UHR Hours   (0-23)
+44C  UHR Days LSW
+44D  UHR Days MSW
+44E  -
+44F  -
+450  SU0 10ms    (0-98)
+451  SU0 Seconds (0-59)
+452  SU0 Minutes LSW
+453  SU0 Minutes MSW
+454  SU1 10ms    (0-98)
+455  SU1 Seconds (0-59)
+456  SU1 Minutes LSW
+457  SU1 Minutes MSW
+458  SU2 10ms    (0-98)
+459  SU2 Seconds (0-59)
+45A  SU2 Minutes LSW
+45B  SU2 Minutes MSW
+45C  SU3 10ms    (0-98)
+45D  SU3 Seconds (0-59)
+45E  SU3 Minutes LSW
+45F  SU3 Minutes MSW
+460  $ND
+461
+462
+463
+464  $SIZE Value
+465
+466
+467
+
+Return Stack
+------------
+
+
+5F0 IPS Return Stack base
+5F1  (Stack underflow)
+5F2		v
+5F3		v
+5F4		v
+5F5		v
+5F6		v
+5F7		v
+5F8		v
+5F9		v
+5FA		v
+5FB		v
+5FC		v
+5FD		v
+5FE		v
+5FF (Underflow max 4 items)
+
+600   IPS begins here (RUMPELSTILZCHEN)
+
+-------------------------------
+Paul Willmott March 23, 2005

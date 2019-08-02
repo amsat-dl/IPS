@@ -1,0 +1,580 @@
+(  IPS32-M    For the M3205 Meinzer IPS32 Computer            )
+(               Version 1.0.9  -  March 24, 2005              )
+(                     by Paul Willmott                        )
+( ----------------------------------------------------------- )
+(            **** TO BE COMPILED BY IPSY32-M ****             )
+( ----------------------------------------------------------- )
+( 1.0.1 - February 18, 2005 Created PCLW                      )
+( 1.0.2 - February 24, 2005 RP-LOOP, TR-LOOP, 3V3 added PCLW  )
+( 1.0.3 - February 25, 2005 +! changed from IPS to rcode PCLW )
+( 1.0.4 - March 17, 2005    - PCLW                            )
+(       - syspage address changes                             )
+(       - DVFLAG added at #440	                          )
+(       - $H removed from syspage now var                     )
+(       - P1 removed from syspage now var                     )
+(       - LOADFLAG moved from #42D to #444                    )
+(       - P2 moved from #43C to #438                          )
+(       - P3 moved from #440 to #43C                          )
+(       - Return Stack moved from #5F0 to #4F0                )
+(       - IPS Starts at #500                                  )
+(       - Stop Watches moved from #434 to #450                )
+(       - $TVS removed, now TV0 is used instead               )
+(       - DV definition and use thereof added                 )
+(       - $dep renamed $depw, $DEP renamed $DEPW              )
+(       - $POLYNAME seed changed to #57CE8D00                 )
+(       - CLS renamed AWEG                                    )
+(       - $LL removed, restriction removed from WEG/AB        )
+(       - $SIZE added, and concept of resizing memory         )
+(       - space before starting emulator loop                 )
+(       - $SL, $ML now definitions                            )
+(       - $LANG and multiple language error messages          )
+(       - dropped                                             )
+(       - sequence of items in $ccodes changed RETEX 4th      )
+(       - FELD and " now force to 4 byte boundary             )
+(       - $CSCAN now written in IPS                           )
+(       - $SUCH now written in IPS, no $SCODE usage           )
+(       - $TUE removed, compiler modified                     )
+(       - L>>> removed, >>> now has long capability           )
+(         1 <= Count <= 2147483647                            )
+(       - First 64 bytes are atomic wrt pseudo interrupt      )
+(       - F-VERGL same as 16 bit, 256 based                   )
+(       - as all flag variables are 4 bytes, @ and !          )
+(       - replace where @B and !B were used previously        )
+(       - CYC2 rcode added                                    )
+(       - $OSCLICODE rcode removed, and usage thereof         )
+(       - S-ON removed                                        )
+(       - minor change to ENTRYSETUP                          )
+( 1.0.5 - March 18, 2005    - PCLW                            )
+(       - Formatting changes                                  )
+(       - $SIZE, DVFLAG & $H Initialisation bugs fixed        )
+(       - Debug $h setting removed                            )
+( 1.0.6 - March 21, 2005    - PCLW                            )
+(       - Return Stack moved to #5F0                          )
+( 1.0.7 - March 23, 2005                                      )
+(       - Bug in TLITERAL fixed - SEM                         )
+(       - code and rcode updated for 4 byte boundaries - PCLW )
+(       - $P3 removed - PCLW                                  )
+(       - H4INC changed - PCLW                                )                         
+(       - Init of Stop-Watches changed                        )
+(       - IPS32-M Splash format changed to same as IPSX-32    )
+( 1.0.8 - March 23, 2005 - PCLW                               )
+(       - All previous versions compiled using IPSX32-M       )
+(       - Changes made to allow compilation by IPSY32-M       )
+( 1.0.9 - March 24, 2005 - PCLW                               )
+(       - Comments changed to single line for IPS-Y reasons   )
+(       - Core Portable IPS Section added                     )
+(       - Implementation options added for $CSCAN, $SCODE,    )
+(       - OSCLI & DEFCHAR                                     )
+(       - Info Splashes made generic                          )
+(       - Filename changed from IPS32-M-Y.SRC to IPS32-M.SRC  )
+( ----------------------------------------------------------- )
+(                        adapted from                         )
+(  IPS-MP     For Any Machine     Version 2.05  2001 Jun 17   )
+(                     by James Miller                         )
+( ----------------------------------------------------------- )
+
+~      Compiling!               ~ #000001D5 !t    
+                                         ( Information splash )
+
+>x-mode                                  ( Enter compile mode )
+#00000000 $th !n
+#0 thier $aof !n thier $aof dup 1 +n #7FFF >>>n 
+                                                ( Wipe memory )
+
+                            ( Fill screen buffer  with spaces )
+#20 thier $aof !n thier $aof dup 1 +n  #3FF >>>n
+
+~ IPS32-M 2005-03-23 1.0.8 ~ #000001D5 $aof !t   ( Identifier )
+
+( DEFEX )  01                          ( Codes for y-compiler )
+( VAREX )  03
+( CONSEX ) 02  $ccodes  3 !fw
+
+#00000600 $th !n                              ( Code routines )
+
+( When the emulator checks @ HP it must always point to       )
+( "excecutable code".  In this implementation the pointer is  )
+( used as an index into a jump table in the code of the       )
+( IPS32 engine.  This is done for simplicity.                 )
+
+( ---------------- Mandatory Code Routines ------------------ )
+
+#00  rcode    RUMPELSTILZCHEN    #04  rcode    RETEX
+#05  rcode    @                  #06  rcode    @B
+#07  rcode    !                  #08  rcode    !B
+#09  rcode    +!	               #0A  rcode    4BLITERAL
+#0B  rcode    BRONZ              #0C  rcode    JUMP
+#0D  rcode    WEG                #0E  rcode    PWEG
+#0F  rcode    +                  #10  rcode    -
+#11  rcode    DUP                #12  rcode    PDUP
+#13  rcode    VERT               #14  rcode    ZWO
+#15  rcode    RDU                #16  rcode    RDO
+#17  rcode    I                  #18  rcode    S>R
+#19  rcode    R>S                #1A  rcode    =0
+#1B  rcode    >0                 #1C  rcode    <0
+#1D  rcode    >=U                #1E  rcode    F-VERGL
+#1F  rcode    NICHT              #20  rcode    UND
+#21  rcode    ODER               #22  rcode    EXO
+#23  rcode    BIT                #27  rcode    $JEEX              
+#28  rcode    LOOPEX             #29  rcode    +LOOPEX            
+#2A  rcode    >>>                #2B  rcode    P*                 
+#2C  rcode    P/MOD              #2E  rcode    $POLYNAME
+#31  rcode    CHS                #33  rcode    $CLOSEFILE         
+#34  rcode    $OPENFILE          #36  rcode    $LOADCODE
+#37  rcode    $SAVECODE          #38  rcode    $IPSETZEN
+#39  rcode    $PSHOLEN           #3A  rcode    $PSSETZEN
+
+( -------------- Optional, but used by Flight  -------------- )
+
+#24  rcode    CBIT               #25  rcode    SBIT               
+#26  rcode    TBIT               #32  rcode    CYC2 
+
+( ---------------- Optional, Trig. Extensions  -------------- )
+
+#3B  rcode    RP-LOOP            #3C  rcode    TR-LOOP 
+#3D  rcode    3V3              
+
+( ---------------- Optional, Math Extensions  --------------- )
+
+#3F  rcode    P+                 #40  rcode    P-
+
+( ------------ Optional, Performance Extensions  ------------ )
+
+( #2F  rcode    $SCODE )       ( #30  rcode    $CSCAN )
+
+( -------------- Optional, Platform Extensions  ------------- )
+
+( #35  rcode    $OSCLICODE )   ( #3E  rcode    $DEFCHARCODE )
+
+( --------------------- End Code Routines ------------------- )
+
+( *********************************************************** )
+(               Start of Core Portable IPS32-M                )
+( *********************************************************** )
+
+#00000448  kon  UHR
+#00000450  kon  SU0
+#00000454  kon  SU1
+#00000458  kon  SU2
+#0000045C  kon  SU3
+#00000404  kon  KETTE
+
+0 kon 0   1 kon 1   2 kon 2   4 kon 4
+
+'n RETEX 'n 4BLITERAL 'n BRONZ 'n JUMP 'n $JEEX  'n LOOPEX
+'n +LOOPEX  $ccodes 12 +n 7 !fw
+( See list at the beginning of IPS-Y ! ) 
+
+( IPS general definitions )
+
+:n >    - >0   ;n                :n <>    - =0 NICHT      ;n
+:n =    - =0   ;n                :n >=    - <0 NICHT      ;n
+:n <    - <0   ;n                :n <=    - >0 NICHT      ;n
+                                 :n <>0     =0 NICHT      ;n
+:n *       P* WEG ;n             :n P/     P/MOD WEG      ;n
+:n /MOD  #0 VERT P/MOD ;n        :n /       /MOD WEG      ;n
+:n MOD  /MOD VERT WEG ;n   
+:n $!>> I ! ;n             ( Replaces $TUE, but is reentrant  ) 
+
+( Compiler constants )
+#000001C0  kon  SYSLINE    ( Posn.  buffer for messages       )
+#0000042C  kon  READYFLAG  ( Compiler free to process input   )
+#00000430  kon  $PE        ( Pointer to end of input          )
+#00000434  kon  $PI        ( Compiler read pointer            )
+#00000438  kon  $P2        ( End of block reached flag        )
+#00000440  kon  DVFLAG     ( to indicate need to update video )     
+#00000444  kon  LOADFLAG   ( Input coming from file           )
+#00000460  kon  $ND        ( Hash value                       )
+#00000464  kon  $SIZE      ( requested memory space size      )
+:n $SL $SIZE @ #10 - ;n    ( Stack limit                      )
+:n $ML $SIZE @ #80 - ;n    ( Memory limit                     )
+
+$ccodes       @n kon DEFEX
+$ccodes 04 +n @n kon VAREX
+$ccodes 08 +n @n kon CONSEX
+
+#00000000  kon  TV0        ( 1st   TV screen line position )
+#00000100  kon  TV4        ( 4th   TV screen line position )
+#00000200  kon  TV8        ( 8th   TV screen line position )
+#000003FF  kon  $TVE       ( Last  TV screen line position )
+
+                    ( The Compiler )
+                    ( ------------ )
+
+#00000000 var $H           ( Pointer to memory position )
+#00000001 var $RS
+#00000000 var $P1          ( Compiler parsing position  )
+#00000000 var $F1
+#00000000 var $F2
+#00000000 var $KK
+#00000000 var CFLAG
+#00000000 var BASIS
+#00000000 var BEM
+#00000001 var BEA
+#00000000 var EINGABEZAHL
+#00000000 var Z-LESEN
+#00000000 var COMPILEFLAG
+#00000000 var $V1
+#00000000 var LINK
+
+(  Error messages )
+16 feld STACKMESSAGE  
+16 feld MEMMESSAGE    
+16 feld NAMEMESSAGE   
+16 feld STRUCMESSAGE  
+16 feld TEXTMESSAGE   
+16 feld RSMESSAGE     
+
+~ SPEICHER VOLL !  ~   'n MEMMESSAGE     04 +n $aof !t
+~ NAME FEHLT !     ~   'n NAMEMESSAGE    04 +n $aof !t
+~ STAPEL LEER !    ~   'n STACKMESSAGE   04 +n $aof !t
+~ STRUKTURFEHLER ! ~   'n STRUCMESSAGE   04 +n $aof !t
+~ TEXTFEHLER !     ~   'n TEXTMESSAGE    04 +n $aof !t
+~ UNZUL. NAME !    ~   'n RSMESSAGE      04 +n $aof !t
+
+( Uncomment the block below for English Error Messages, and )
+( comment out the previous block                            )
+
+( ~ MEMORY FULL !    ~   'n MEMMESSAGE     04 +n $aof !t )
+( ~ NAME MISSING !   ~   'n NAMEMESSAGE    04 +n $aof !t )
+( ~ STACK EMPTY !    ~   'n STACKMESSAGE   04 +n $aof !t )
+( ~ STRUCTURE ERROR! ~   'n STRUCMESSAGE   04 +n $aof !t )
+( ~ TEXT-ERROR !     ~   'n TEXTMESSAGE    04 +n $aof !t )
+( ~ DUPLICATE NAME ! ~   'n RSMESSAGE      04 +n $aof !t )
+
+( Compiler definitions )
+:n INCR   DUP  @  1  +  VERT  !  ;n
+:n HIER   $H  @  ;n
+:n H4INC  4  $H  +!  ;n
+:n $DEPW  HIER  !  H4INC  ;n
+:n DV     1 DVFLAG ! ;n
+
+:n $CEN   DUP  $IPSETZEN  DUP  @B  #80  ODER  ZWO  !B
+          $PI  !  $TVE  $PE  ! DV 0 READYFLAG  ! ;n
+
+:n IE  $P1 @ DUP $PI @ 1 -  je  I  @B  #80  EXO  I  !B
+                            nun  $CEN  WEG $CLOSEFILE  ;n
+
+:n SYSWRITE  SYSLINE 16 >>> 0 IE  ;n
+
+( To use a user supplied $CSCAN code routine - Uncomment )
+( the $CSCAN rcode definition above, and comment out the )
+( following IPS definition.                              )
+
+:n $CSCAN    0 $PI @ $PE @
+     je WEG 1 I @B #20 EXO >0 
+         ja?   I @B CFLAG @ ja? #29 ( KL. ZU ) =
+                                 ja? 0 CFLAG !
+                                 dann
+                             nein: #28 ( KL. AUF ) =
+                                 ja?   1 CFLAG !
+                                 nein: WEG 2
+                                 dann
+                             dann 
+         dann VERT ZWO = ja?   0
+                         nein: R>S $PI ! I S>R
+                         dann
+     nun DUP =0 ja? $PE @ 1 + $PI ! VERT WEG 1 $P2 !
+                dann ;n   
+
+:n $NAME   0   READYFLAG @ 0 $P2 !
+       ja? 1 $CSCAN >0
+          ja? $PI @ $P1 !
+              2 $CSCAN PWEG #57CE8D00
+              $P1 @ $PI @ ZWO - DUP 63 > ja? WEG 63
+                                         dann
+              DUP $ND ! 1 - ZWO +
+              je I @B $POLYNAME
+              nun $ND +!
+	        1 		
+          dann
+       dann ;n
+
+( To use a user supplied $SCODE code routine - Uncomment )
+( the $SCODE rcode definition above, and the $SUCH & $P3 )
+( definitions immediately below and comment out the      )
+( currently active $SUCH IPS definition.                 )
+
+( #0000043C  kon  $P3 ) ( Link pointer for $SUCH  )
+
+( :n $SUCH  LINK @ $P3 ! $SCODE ;n )
+
+:n $SUCH  LINK @ S>R 
+          anfang $ND @ I @ EXO 
+                 #FFFFFF3F UND =0  
+                 ja?   R>S 8 + S>R 1
+                 nein: R>S 4 + @ DUP S>R =0                     
+                 dann
+          ende? R>S ;n
+
+:n $ZAHL 1 ( OK ) 0 ( ANF. ) $PI @ 1 - $P1 @
+  #2D ZWO @B = ja?    1 +  -1 S>R ( NEG ) 10 ( BASIS )
+               nein:        1 S>R ( POS )
+                    #23 ZWO @B =
+                    ja?   1 +             16
+                    nein: #42 ZWO @B =
+                          ja?    1 +       2
+                          nein:           10
+               dann dann  dann   BASIS !
+ VERT je BASIS @ * I @B DUP #3A < ja? #30 -
+                                  dann
+                        DUP #40 > ja? #37 -
+                                  dann
+      DUP BASIS @ >= ZWO <0 ODER ja? ( FEHLER ) WEG 0 RDU
+                                    dann +
+      nun R>S * VERT ;n
+
+:n COMPILER  $NAME
+ja? $SUCH
+    1   ( FUER WEITER ) BEM @
+        ja? ZWO 'n RUMPELSTILZCHEN
+                = ja?   ( RUMP. ) 0 BEM !
+                  nein: ( NICHT RUMP. ) Z-LESEN @
+                       ja?   PWEG 0 1
+                       nein: ZWO BEA @ <
+                             ja? IE WEG 0
+                             dann
+                       dann
+                  dann
+        dann
+   ja?  ( WEITERFLAG ? )  DUP =0
+        ja? ( NUMBERPROCESSOR )
+         WEG $ZAHL
+          ja?  COMPILEFLAG @
+            ja? 'n 4BLITERAL $DEPW $DEPW
+            nein: BEM @ ja? EINGABEZAHL ! 0 Z-LESEN !
+                         dann
+            dann
+          nein: IE
+          dann
+      nein: ( FOUNDPROCESSOR ) DUP 8 - @B #C0 UND
+            COMPILEFLAG @ ODER
+            DUP 1 =
+            ja?   WEG HIER $ML >=U ja?  WEG MEMMESSAGE SYSWRITE
+                                  nein: $DEPW
+                                  dann
+            nein: DUP #80 = VERT #C1 = ODER
+                  ja?    IE
+                  nein: R>S $V1 ! $!>> 
+                  RUMPELSTILZCHEN $V1 @ S>R
+                  ( $!>> Puts address into following       )
+                  ( RUMPELSTILZCHEN position for execution )
+                  dann
+            dann
+      dann
+      $PSHOLEN $SL > ja? $SL $PSSETZEN STACKMESSAGE SYSWRITE
+                       WEG $F1
+                   dann
+   dann
+dann READYFLAG @ $P2 @ UND
+   ja? #20 TV8 !B TV8 DUP 1 + $PI @ TV8 - 1 - >>> TV8 $CEN
+   dann  ;n
+
+             ( Compiler Auxiliary routines )
+             ( --------------------------- )
+
+:n ENTRYSETUP $F1 $KK ! $NAME DUP
+       ja?   $SUCH <>0 $RS @ UND
+             ja?   RSMESSAGE SYSWRITE WEG  0
+             nein: HIER DUP $KK ! LINK @ H4INC
+                   $DEPW $ND @ ZWO ! LINK ! HIER VERT H4INC
+             dann
+       nein: NAMEMESSAGE SYSWRITE
+       dann ;n
+
+:n $GETADR $NAME ja?   $SUCH DUP =0
+                             ja?   IE      0
+                             nein:         1
+                             dann
+                nein: NAMEMESSAGE SYSWRITE 0
+                dann ;n
+
+:hpri  '     $GETADR ja? COMPILEFLAG @
+                        ja? 'n 4BLITERAL $DEPW $DEPW
+                        dann
+                    dann ;n
+
+:prior  ;     'n RETEX $DEPW  0 COMPILEFLAG !
+         $F2 <>
+         ja? STRUCMESSAGE SYSLINE #20 + 16 >>>
+             LINK @ DUP $H ! 4 + @ LINK !      0 IE
+         dann ;n
+
+:int  :   ENTRYSETUP ja? DEFEX VERT ! 1 COMPILEFLAG ! $F2
+                    dann ;n
+
+:n PRIMODIFY   $KK @ @B ODER $KK @ !B ;n
+
+:int :PRIOR :    #80 PRIMODIFY ;n
+:int :HPRI  :    #40 PRIMODIFY ;n
+:int :INT   :    #C0 PRIMODIFY ;n
+
+:prior JA? 'n BRONZ $DEPW HIER H4INC ;n
+:prior DANN  HIER VERT ! ;n
+:prior NEIN: 'n JUMP $DEPW HIER H4INC VERT DANN ;n
+:prior JE    'n $JEEX $DEPW HIER H4INC ;n
+:prior NUN   'n LOOPEX  $DEPW DUP DANN 4 + $DEPW ;n
+:prior +NUN  'n +LOOPEX $DEPW DUP DANN 4 + $DEPW ;n
+:prior ANFANG HIER ;n
+:prior ENDE? 'n BRONZ $DEPW $DEPW ;n
+:prior DANN/NOCHMAL VERT 'n JUMP $DEPW $DEPW DANN ;n
+
+:int KON        ENTRYSETUP ja? CONSEX VERT ! $DEPW
+                           dann ;n
+
+:int VAR        ENTRYSETUP ja? VAREX  VERT ! $DEPW
+                           dann ;n
+
+:int FELD       ENTRYSETUP ja? VAREX  VERT ! HIER + 3 +
+                           #FFFFFFFC UND $H !
+                           dann ;n
+
+'n TV4 04 +n $aof @n var SP                 (  Screen Pointer )
+
+:n !CHAR  SP @ !B SP INCR ;n
+
+:n TLITERAL  I 1 + R>S @B PDUP + S>R
+              SP @ PDUP + SP ! VERT >>> R>S 3 + #FFFFFFFC UND
+              S>R ;n
+
+:hpri " $PI INCR $PI @ 0 ZWO DUP 257 + DUP $TVE >
+                                        ja? WEG $TVE dann
+        je $PI @ @B #22 =
+           ja?
+           R>S PWEG 1 I S>R
+           dann  $PI INCR
+        nun
+        ZWO $PI @ 2 - VERT - DUP >0 RDO UND
+        ja?  COMPILEFLAG @
+             ja?
+               S>R I 'n TLITERAL $DEPW HIER !B
+               $H INCR HIER I >>> HIER  R>S + 3 +
+               #FFFFFFFC UND $H !
+             dann
+        nein:   TEXTMESSAGE SYSWRITE VERT WEG
+        dann   ;n
+
+:int !T  VERT  >>>  ;n
+
+:n LEERZ  S>R SP @ #20 ZWO !B DUP 1 + R>S 1 - >>> ;n
+
+:int OK   SP @ SYSLINE SP !  #40 LEERZ  SP !  ;n
+
+:n !FK    S>R I 4 * + 1 R>S je 4 - DUP S>R ! R>S
+                           nun WEG ;n
+
+:n WAND BASIS @ 10 = ja?   DUP ( ZAHL ) <0
+                          ja? CHS #2D ( - ) !CHAR
+                          dann #3B9ACA00 0 
+                               ( W.-ANFANG DEZ )
+                    nein: 16 BASIS ! #23 ( # ) !CHAR
+                               #10000000 1 
+                               ( W.-ANFANG HEX )
+                    dann  S>R
+   anfang VERT ZWO /MOD VERT
+            I NICHT ja?  DUP >0 ja? R>S WEG 1 S>R
+                    dann        dann
+                  I ja?  DUP  #30 + DUP #39 >
+                                    ja? 7 +
+                                    dann !CHAR
+                    dann
+                    WEG VERT BASIS @ / DUP =0
+   ende? PWEG R>S NICHT ja? #30 !CHAR
+                        dann ;n
+
+:n ZEIG-STAPEL
+   $P2 @ ja?
+         SP @ S>R  TV0 SP ! #80 LEERZ
+    $PSHOLEN $SL ZWO - DUP 32 > ja? WEG 32
+                                dann  S>R I +
+    anfang I >0
+      ja? DUP I - @ R>S 4 - S>R
+        TV0 I 4 * + SP !  WAND
+      dann/nochmal
+    R>S  PWEG R>S SP ! DV
+   dann ;n
+
+:n $INSERT  VERT  #7  UND    4  *  KETTE  +  !  ;n
+
+:n $CHAINACT  COMPILEFLAG  @
+             ja?    'n  4BLITERAL  $DEPW  $DEPW
+                    'n  $INSERT    $DEPW
+             nein:  ZWO  #FFFFFFF8  UND  ( mask for 0-7 )
+                    =0  ja?    $INSERT
+                        nein:  IE
+                        dann
+             dann  ;n
+
+:hpri AUSH   'n  RUMPELSTILZCHEN  $CHAINACT  ;n
+
+:hpri EINH   $GETADR  ja?  $CHAINACT
+                      dann ;n
+
+:int ?  $GETADR  ja? 4 +
+                 dann  ;n
+
+:n SCHREIB    S>R SP @ I >>> SP @ R>S + SP ! ;n
+
+:int WEG/AB
+   $GETADR  ja?  
+                 4  -  DUP  @  LINK  !  4  -  $H  !
+            dann  ;n
+
+( ********************************************************** )
+(                End of Core Portable IPS32-M                )
+( ********************************************************** )
+
+         ( File handling, utilities and extensions )
+         ( --------------------------------------- )
+
+:int AWEG   $SL  $PSSETZEN  ;n                (  Clear Stack )
+
+:int $SAVE  $SAVECODE      DUP  =0  ja?   IE
+                                    nein: WEG
+                                    dann      ;n
+
+:int $LOAD  $LOADCODE      DUP  =0  ja?   IE
+                                    nein: WEG
+                                    dann      ;n
+
+:int READ   $OPENFILE      DUP  =0  ja?   IE  0
+                                    dann  LOADFLAG  !  ;n
+
+( To implement the optional definition OSCLI -     )
+( Uncomment the $OSCLICODE rcode definition above, )
+( and the following IPS definition                 )
+
+( :int OSCLI $OSCLICODE      DUP  =0  ja?   IE     )
+(                                     nein: WEG    )
+(                                     dann     ;n  )
+
+( To implement the optional definition DEFCHAR -   )
+( Uncomment the $DEFCHARCODE rcode definition      )
+( above, and the following IPS definition          )
+
+(                                                  )
+( :int DEFCHAR $DEFCHARCODE  DUP  =0  ja?   IE     )
+(                                     nein: WEG    )
+(                                     dann     ;n  )
+
+             ( Build the rest of SYSPAGE etc )
+             ( ----------------------------- )
+
+'n COMPILER                                (  Construct chain )
+'n ZEIG-STAPEL 'n RUMPELSTILZCHEN dup dup dup dup dup dup
+'n JUMP #00000400   #00000400 $aof 11 !fw
+
+     #1 #1 #1 #1 #00000450 $aof #4 !fw         ( Stop watches )
+ #10000 'n $SIZE #4 +n $aof @n $aof !n ( Req. Mem. Size - 64k )
+    #1 'n DVFLAG #4 +n $aof @n $aof !n  ( Force Screen Redraw )
+            thier 'n $H  #4 +n $aof !n               ( Set $H )
+     #200 'n $PI #4 +n $aof @n $aof !n       ( Initialise $PI )
+       tlink @n  'n LINK #4 +n $aof !n             ( Set LINK )
+
+                ( End of metacompilation )
+
+               ( Save IPS32-M binary image )
+
+#0000 $aof thier $aof  ~ IPS32-M.BIN ~ $save   
+
+~ Compilation Complete!       ~ #01D5 !t        ( info splash )

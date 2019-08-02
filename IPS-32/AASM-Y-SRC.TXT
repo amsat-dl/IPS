@@ -1,0 +1,246 @@
+(       ASSEMBLER FOR THE ARM, VERSION T.5 FOR IPS-Y        )
+(             {c} KARL MEINZER 1.03.2005                   )  
+( Note that mnemonics and syntax are still subject to change)
+
+( VAR AND FLAGS )
+#E000 VAR $UCF    ( UPPER CODE FRAGMENT )
+    0 VAR $LCF    ( LOWER CODE FRAGMENT )
+    0 VAR $AFRS   ( ASSEMBLER FLAG REGISTER SHIFT )
+    0 VAR $AFAM   ( ASSEMBLER FLAG ADDRESS MODE )
+    
+( ERROR MESSAGES AND HANDLING )
+16 FELD $AGEM  " ARGUMENT ERROR!  "   $AGEM !T
+16 FELD $NPEM  " NONPERMISSIBLE!  "   $NPEM !T
+16 FELD $ICEM  " INVALID CNDX!    "   $ICEM !T
+16 FELD $AIEM  " ADDRESS INVALID! "   $AIEM !T
+: $AWR   SYSLINE 32 + 16 >>> 0 IE ;
+
+: <AG>  $AGEM $AWR ;
+: <NP>  $NPEM $AWR ;             
+: <CE>  $ICEM $AWR ;
+: <AI>  $AIEM $AWR ;
+
+: ^! DUP @ RDO ODER VERT ! ;
+    
+( AM1 LOWER BUILD, SOME ALSO FOR AM2 )
+: $SHPRE RDU ( shiftcode , Rm , n or 2*Rs ) 
+         DUP 32 < ZWO $AFRS @ NICHT UND ODER    
+         JA? 128 * RDO ODER $AFRS @ #10 * ODER ZWO 16 <
+             JA? ODER $LCF !  1 $AFAM !
+                 $AFRS @ 1 EXO DUP + $AFRS ! ( R-IM-SHIFT: 2 )
+             NEIN: <AG> 
+             DANN
+         NEIN: <AG>    
+         DANN ;
+            
+: ROR.IM  DUP DUP 30 > RDO ODER
+        JA? <AG>
+        NEIN: VERT DUP #FF00 UND =0 ( r , n , cond. )
+              JA? VERT 128 * + $LCF ! #0200 $UCF ^!
+                  1 $AFAM !
+              NEIN: <AG>
+              DANN 
+        DANN ;
+               
+: IM   0 ROR.IM ;
+: RSS  2 * 1 $AFRS ! ;
+
+( SHIFT-SPECIFIERS ) 
+: LSL   0  $SHPRE ;
+: LSR  #20 $SHPRE ;
+: ASR  #40 $SHPRE ;
+: ROR  #60 $SHPRE ;
+: RRX      0 ROR  ;
+: NS       0 LSL  ;
+( INSTR. MODIFIERS )
+: ~F  $AFAM @ 1 = JA? #10 $UCF ^!
+                  NEIN: <NP>
+                  DANN ;
+                  
+: $CNDXTST  DUP #FFF UND #555 =
+            JA? #F000 UND $UCF !  1
+            NEIN: <CE>            0
+            DANN ;
+            
+( AM2 LOWER BUILD )
+( Format immediate: Rn  n  <ADR2>  Rd  <Instr> )
+( Format register im. shift:
+ Rn  Rm  n <shift-specifier> <ADR2> Rd <Instr> )
+ 
+: $A2SPRE  ( REG. IM SHIFT ) $AFRS @ 2 =
+           JA? $UCF ^! 2 $AFAM !
+           NEIN: <AI>
+           DANN ;
+           
+: $A2IPRE  ( 12 BIT IM ) ZWO 4096 < 
+           JA? $UCF ^! $LCF !  2 $AFAM !  
+           NEIN: <AG>
+           DANN ;
+           
+( AM2 SPECIFIERS )
+: [+]    #580 $A2IPRE ;       : [+R]    #780 $A2SPRE ; 
+: [-]    #500 $A2IPRE ;       : [-R]    #700 $A2SPRE ; 
+: []   0 #580 $A2IPRE ;
+: [+]!   #5A0 $A2IPRE ;       : [+R]!   #7A0 $A2SPRE ; 
+: [-]!   #520 $A2IPRE ;       : [-R]!   #720 $A2SPRE ; 
+: []+!   #480 $A2IPRE ;       : []+R!   #680 $A2SPRE ; 
+: []-!   #400 $A2IPRE ;       : []-R!   #600 $A2SPRE ; 
+: []+T!  #4A0 $A2IPRE ;       : []+RT!  #6A0 $A2SPRE ; 
+: []-T!  #420 $A2IPRE ;       : []-RT!  #620 $A2SPRE ;
+
+( BUILDING OF INSTRUCTION CODES )
+
+: $AFLAGRESET  #E000 $UCF ! 0 $LCF ! 0 $AFRS ! 0 $AFAM ! ;
+
+: $ACDEP       $UCF @ #10000 * $LCF @ #FFFF UND + $DEPT
+               $AFLAGRESET ;
+
+: $CHECK&DEP S>R RDU PDUP ODER #FFF0 UND =0
+            $AFAM @ R>S = UND 
+            JA? ( op Rn Rd ) #1000 * $LCF ^!
+                ODER $UCF ^! $ACDEP
+            NEIN: <AI>
+            DANN ;
+: $AM0INST ( Rn Rd opcode ) 0 $CHECK&DEP ;            
+: $AM1INST ( Rn Rd opcode ) 1 $CHECK&DEP ;
+: $AM2INST ( Rn Rd opcode ) 2 $CHECK&DEP ;
+
+( DP-INSTRUCTIONS )
+: AND      #000 $AM1INST ;    : ~AND  0       #110 $AM1INST ; 
+: EOR      #020 $AM1INST ;    : ~EOR  0       #130 $AM1INST ; 
+: SUB      #040 $AM1INST ;    : ~SUB  0       #150 $AM1INST ; 
+: RSB      #060 $AM1INST ;    : ~ADD  0       #170 $AM1INST ; 
+: ADD      #080 $AM1INST ;    : MOV   0 VERT  #1A0 $AM1INST ; 
+: ADC      #0A0 $AM1INST ;    : MVN   0 VERT  #1E0 $AM1INST ; 
+: SBC      #0C0 $AM1INST ;    : NOP   0  NS 0 MOV ;  
+: RSC      #0E0 $AM1INST ;                     
+: ORR      #180 $AM1INST ;
+: BIC      #1C0 $AM1INST ;
+   
+( LD/STR INSTRUCTIONS )                                       
+: LDR      #10  $AM2INST ;
+: LDB      #50  $AM2INST ;
+: STR      #00  $AM2INST ;
+: STB      #40  $AM2INST ;
+
+( COMPOSITE INSTRUCTIONS )
+: $MULCODE S>R RDU RSS LSL #80 $LCF ^! R>S VERT ;
+: $SWPPREP  ZWO #FFF0 UND $AFAM ! VERT #90 ODER $LCF ^! ;
+
+: MUL  ( Rm Rs Rd )      0 VERT $MULCODE    0 $AM1INST ;
+: UMUL ( Rm Rs Rdl Rdh )        $MULCODE  #80 $AM1INST ;
+: MLA  ( Rm Rs Rn Rd )          $MULCODE  #20 $AM1INST ;
+: SMUL ( Rm Rs Rdl Rdh )        $MULCODE  #C0 $AM1INST ;
+: SMLA ( Rm Rs Rdl Rdh )        $MULCODE  #E0 $AM1INST ;
+: SWP  ( Rn Rm Rd )             $SWPPREP #100 $AM0INST ;
+: SWPB ( Rn Rm Rd )             $SWPPREP #140 $AM0INST ;
+
+( LOAD MULTIPLE, FORMAT: )
+( Rn Register_Mask <adr.Spec.> {SPSR/PRIV} <Instr>  )
+: STM  $AFAM @ 4 =
+       JA? $LCF ! #F UND #800 ODER $UCF ^! $ACDEP
+       NEIN: <AI>
+       DANN ;                   
+: LDM         #10 $UCF ^! STM ;
+: $AM4GEN   $UCF ^! 4 $AFAM ! ;
+: SPSR/PRIV  #40 $UCF ^! ;
+
+( LDM/STM ADR. SPECS )
+: DEC/A    #00  $AM4GEN ;
+: DEC/A!   #20  $AM4GEN ;
+: DEC/B   #100  $AM4GEN ;
+: DEC/B!  #120  $AM4GEN ;
+: INC/A    #80  $AM4GEN ;
+: INC/A!   #A0  $AM4GEN ;
+: INC/B   #180  $AM4GEN ; 
+: INC/B!  #1A0  $AM4GEN ;
+
+
+( STATUS MOVES )
+: $STATPREP     0 NS #F VERT ;
+
+: CP->R ( Rd ) $STATPREP #100 $AM1INST ;
+: SP->R ( Rd ) $STATPREP #140 $AM1INST ;
+: ->SP  ( Mask , <sh.op; only Rm NS or n r R.IM> )
+        #F #160 $AM1INST ;        
+: ->CP  ( Mask , <sh.op; only Rm NS or n r R.IM> )
+        #F #120 $AM1INST ;
+        
+(  26-BIT-MODE STATUS SETTING )        
+: P~AND  #F       #110 $AM1INST ;        
+: P~EOR  #F       #130 $AM1INST ;
+: P~SUB  #F       #150 $AM1INST ;
+: P~ADD  #F       #170 $AM1INST ;
+
+( FLOW CONTROL INSTRUCTIONS )
+
+( CNDX-Codes )
+: Z          #0555 ;            : NZ        #1555 ;
+: C          #2555 ;            : NC        #3555 ;
+: NEG        #4555 ;            : NNEG      #5555 ;
+: OF         #6555 ;            : NOF       #7555 ;
+: HI         #8555 ;            : LS        #9555 ;
+: GE         #A555 ;            : LT        #B555 ;
+: GT         #C555 ;            : LE        #D555 ; 
+: ALWAYS     #E555 ;            : NEVER     #F555 ;
+
+: $AINS (<addr of B-inst> <B-target> ) 
+        ZWO 8 + - 4 / #00FFFFFF UND VERT $AOF ^! ;
+
+: Y?->  $CNDXTST WEG ;
+: Y?    #1000 EXO $CNDXTST
+        JA? #A00 $UCF ^! 0 $LCF ! THIER $ACDEP 
+        DANN ;
+: TH    THIER $AINS ;        
+: N:    NEVER Y?  VERT TH ;
+
+: BEGIN THIER ;
+: END   Y? VERT $AINS ;
+: SWI   ( Al Ah ) #FF UND #F00 ODER $UCF ^! $LCF ! $ACDEP ;
+: JMP/L #1000 EXO Y? #100 ZWO 2 + ^! VERT $AINS ;
+
+( SYSTEM INTERFACE TO JRM'S M-9097 IPS ENGINE AND THUS IPS-M )
+( REGISTER ALOCATIONS )
+
+15 KON PC    ( ARM-PC )
+(  14 is LINK  ) 
+13 KON RS
+12 KON PPC   ( IPS PSEUDO PROGRAM COUNTER ) 
+11 KON HP    ( MEM-RELATIVE )
+10 KON PS
+9  KON NEA   ( NEXT executable addres ) 
+8  KON MEM
+
+
+( NOT EXPLICITLY NAMED REGISTERS )
+( 0 - 7  GENERAL PURPOSE ) 
+( 13  also ARM-STACK )
+( 14  LINK-HOLD )
+( 15  ARM-PC AND STATUS - 26 BIT MODE )
+
+: code     THIER 3 + #FFFC UND $TH ! ( WORD-ALIGN ) $AFLAGRESET
+     entrysetup
+     JA? THIER VERT $AOF !               
+     DANN ;
+             
+: NEXT   NEA NS PC MOV ; 
+ ( Deposits the return jump via from r7 )
+ 
+
+
+( COPROCESSOR #15 INSTRUCTIONS )
+( R->C15 CORRESPONDS TO MCR, C15->R CORRESPONDS MRC )
+( FORMAT: CRn CRm Rd OPC_2 Instr. )
+
+: R->C15  32 * VERT #1000 * ODER #F10 ODER ODER $LCF !
+          #F UND #E00 ODER $UCF ^! $ACDEP ;
+: C15->R  #10 $UCF ^! R->C15 ;          
+
+
+( END OF ARM-ASSEMBLER )
+
+ 0 KON r0    1 KON r1    2 KON r2    3 KON r3
+ 4 KON r4    5 KON r5    6 KON r6
+                                              
+ 13 KON r13  14 KON r14 
+

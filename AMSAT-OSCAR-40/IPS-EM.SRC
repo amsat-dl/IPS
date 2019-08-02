@@ -1,0 +1,1677 @@
+
+(  IPS-EM for AMSAT  SA-1100 IHU-2 Version 0.12  2000 May 16  )
+(                     by James Miller                         )
+( ----------------------------------------------------------- )
+
+~ Compiling IPS-EM     ~ #01D5 !t        ( Information splash )
+
+X>>  #3E00 $O !n   ( Set X-compile mode; move target )
+                   ( zone down #200 bytes.           )
+
+#0000 $h !n
+#0  hier !O  hier $OC dup 1 +n #3FFF l>>>       ( Wipe memory )
+
+#040E $h !n
+  0   ,  1 ,  ( T/Z and INFLAG )
+
+#0410 $h !n
+( EMULATOR )
+ PPC #1 []+  HP  LDB ( lsb     read @ PPC  PPC+=1 )
+ PPC #1 []+  r0  LDB ( msb                 PPC+=1 )
+ HP r0 #8 LSL HP ADD ( HP = lsb + msb*256; IPS address )
+ HP BASE-ADDRESS NS HP ADD ( convert HP to physical address )
+
+( $TUE re-entry )
+ HP #1 []+   r1  LDB ( lsb     read @ HP   HP+=1 )
+ HP #1 []+   r0  LDB ( msb                 HP+=1 )
+ r1 r0 #8 LSL r0 ADD ( r0 = @HP =  lsb + msb*256; IPS address  )
+
+( Code despatch; synthesise BL  MEM+r0 )
+ hier $OC  ( .A )                          ( for 20ms despatch )
+ r15 NS r14 MOV                ( link address points to RETURN )
+ BASE-ADDRESS r0 NS r15 ADD             ( jump to code routine )
+
+( RETURN )         ( all code routines and 20ms return to here )
+ BASE-ADDRESS #458 [+] r15 LDR ( Jump to EMULATOR or next line )
+ #71 28 R.IM r0 MOV                         ( r0= 20ms address )
+NEVER END ( jump .A )                          ( code despatch )
+
+#0464 $h !n                                    ( Stop watches )
+1 , 0 , 0 , 0 ,  1 , 0 , 0 , 0 ,
+1 , 0 , 0 , 0 ,  1 , 0 , 0 , 0 ,
+
+#0474 $h !n
+( UHR limits                    SW limits )
+  100 , 60 , 60 , 24 , 0 , 0 ,  98 , 59 , #FF , #FF ,
+
+#410  #0458 !O  ( NRA )
+
+#04FB $h !n
+( SYNCH-VECTOR )
+#50 , #39 , #15 , #ED , #30 ,  ( ENDE BAU PAGE #0400 )
+
+( $EBU MIT LEERZEICHEN FUELLEN )
+#2020 #500 ( $EBU ) !O
+#500 $OC dup 01 +n 511 l>>>
+
+#0710 $h !n
+( PSEUDO-INTERRUPT handler )
+
+( RESET emu/20ms Switch to Emulator )
+ BASE-ADDRESS #41 ( emu ) 28 R.IM r0 ADD
+ BASE-ADDRESS #0458 [+]           r0 STR
+
+( CLOCKS )
+ BASE-ADDRESS #4 24 R.IM  r5 ADD   ( SYSPAGE )
+ r5  #5E IM  r1  ADD    ( pointer to UHR )
+ r1  #0 [+]  r0  LDB    ( get 1st time element - cs )
+ r0  #2 IM   r0  ADD    ( centisec+=20ms )
+ r1  #0 [+]  r0  STB    ( replant cs. )
+
+ r1  #5 IM   r3  ADD    ( last element )
+ BEGIN  ( A )
+   r1 #16 [+]  r2 LDB   ( get limit  at UHR + 22 )
+   r0 r2 NS r0 ~F EOR   ( test for limit )
+   Z Y? vert            ( lim not reached; jump B )
+
+   r1  #1 []+  r0 STB   ( store 0 at element; r1+=1 )
+   r1  #0 [+]  r0 LDB   ( get next element )
+   r0  #1 IM   r0 ADD   ( increment element )
+   r0 #FF IM   r0 AND   ( restrict to 1-byte for EOR )
+   r1  #0 [+]  r0 STB
+   r1  r3 NS     ~EOR   ( all done? )
+ Z END ( n. jump A )
+     TH  ( B )
+
+( STOPWATCHES )
+ r5  #64 IM  r5  ADD ( pointer to SU0 )
+ r5  #10 IM  r6  ADD ( last stopwatch+1 )
+ BEGIN   ( A )
+   r1  r5 NS  MOV ( working elements pointer )
+   BASE-ADDRESS #4 24 R.IM  r2 ADD   ( SYSPAGE )
+   r2  #7A IM  r2  ADD      ( pointer to SU limits )
+   r1   #3 IM  r3  ADD      ( last element, for this su loop )
+   r1  #0 [+]  r0  LDB      ( get cs )
+   r0   #1 IM     ~AND      ( odd? )
+   Z Y? vert ( odd; counter is stopped; jump E )
+   r0   #2 IM  r0  SUB      ( even; counter is running )
+   r1  #0 [+]  r0  STB      ( and save )
+   BEGIN   ( B )
+     r2  #1 []+  r4  LDB    ( get limit; r2+=1 )
+     r0  #0 IM      ~SUB    ( gone negative? )
+     LT Y? vert ( GE n.; jump F )
+           ( LT y. ripple down )
+     r1  #1 []+  r4  STB    ( replace element with limit r1+=1 )
+     r1  #0 [+]  r0  LDB    ( get [next] element )
+     r0  #1 IM   r0  SUB    ( decrement )
+     r1  #0 [+]  r0  STB    ( and save )
+     r1  r3 NS      ~SUB    ( all elements done? )
+   GE END ( n. jump B )
+      TH ( F ) ( now check if all bytes zero )
+   r5 NS      r3  MOV       ( first       ; do by 1 word )
+   r3  #4 IM  r4  ADD       ( last+1      ; pickup!!!! )
+   BEGIN  ( C )
+     r3  #1 []+  r0  LDB    ( get element )
+     r0  #0 IM      ~SUB    ( =0? )
+     Z Y?  vert ( n. not matured; jump G )
+     r3  r4 NS      ~SUB    ( all bytes done? )
+   GE END ( LT n. jump C )
+                            ( all bytes zero )
+   r0  #1 IM         MOV    ( plant 1 in cs )
+   r5  #0 [+]    r0  STB    ( time_element+0 ; r5+=4 )
+       TH    ( G )
+vert TH   ( E )
+   r5  #4 IM  r5  ADD       ( point to next group of SUs )
+   r5  r6 NS     ~SUB       ( all four SUs done? )
+ GE END                     ( n. jump A )
+ ( end stopwatches )
+NEXT                        ( returns to emu+36)
+
+                   ( Code routines )
+
+( DEFEX )  hier  $ccodes !n   ( address for x-compiler )
+( Definition executive; push_rs[PPC]; PPC = HP )
+  PPC BASE-ADDRESS NS r0 SUB ( PPC in IPS units     )
+        RS  #2 [-]!  r0  STB ( push lsb to RS-=2    )
+        r0  #8 LSR   r0  MOV ( get PPC msb          )
+        RS  #1 [+]   r0  STB ( push msb to RS+1     )
+        HP     NS   PPC  MOV ( PPC = HP             )
+NEXT
+
+( VAREX )  hier $ccodes 2 +n !n  ( address for x-compiler )
+( Variable executive;  push_ps[HP] )
+  HP BASE-ADDRESS NS r0 SUB    ( HP relative to MEM  )
+       PS  #2 [-]!   r0 STB    ( push lsb to PS-=2   )
+       r0  #8 LSR    r0 MOV    ( HP>>8 gets msb      )
+       PS  #1 [+]    r0 STB    ( push msb            )
+NEXT
+
+( CONSEX )  hier $ccodes 4 +n !n ( address for x-compiler )
+( Constant executive; push_ps[peek[HP]] )
+         HP #0 [+]  r0  LDB    ( get lsb @HP )
+         PS #2 [-]! r0  STB    ( lsb to stack  ; PS-=2   )
+         HP #1 [+]  r0  LDB    ( get msb from HP+1       )
+         PS #1 [+]  r0  STB    ( msb to stack            )
+NEXT
+
+code RETEX
+( Return executive; PPC = pull_rs )
+      RS  #1 []+    r0  LDB       ( read lsb  RS+=1    )
+      RS  #1 []+    r1  LDB       ( read msb  RS+=1    )
+      r0  r1 #8 LSL r0  ADD       ( IPS memory address )
+      r0 BASE-ADDRESS NS PPC ADD  ( PPC absolute addr  )
+hier NEXT
+
+rcode RUMPELSTILZCHEN
+
+code 1BLITERAL (  Number executive, 1 byte )
+               (  push_ps[peekB[ppc]] ; ppc+=1 )
+       PPC #1 []+     r0  LDB    ( get the byte @PPC  PPC+=1 )
+       PS  #2 [-]!    r0  STB    ( push lsb  PS-=2 )
+           #0 IM      r0  MOV    ( msb=0 )
+       PS  #1 [+]     r0  STB    ( push msb )
+NEXT
+
+code 2BLITERAL (  Number executive, 2 byte )
+               (  push_ps[peek[ppc]] ; ppc+=2 )
+       PPC #1 []+     r0  LDB    ( get  lsb @PPC  PPC+=1 )
+       PS  #2 [-]!    r0  STB    ( push lsb  PS-=2 )
+       PPC #1 []+     r0  LDB    ( get  msb @PPC  PPC+=1 )
+       PS  #1 [+]     r0  STB    ( push msb )
+NEXT
+
+code BRONZ  ( If ps = 0 jump to addr, else carry on )
+        PS   #2 []+   r0  LDB    ( pull lsb  PS +=2 )
+             #1 IM    r0 ~AND    ( TST bit 0 )
+  NZ Y?-> PPC  #2 IM  PPC ADD    ( IF lsbit = 1 then PPC +=2 )
+  NZ Y?-> r14  NS     r15 MOV    ( BNE return ; exit [1] )
+
+  hier ( for JUMP )              ( PPC = @PPC )
+       PPC #0 [+]     r1  LDB    ( lsb  @PPC )
+       PPC #1 [+]     r0  LDB    ( msb  @PPC+1 )
+       r1 r0 #8 LSL   r1  ADD    ( combine and set PPC )
+ r1 BASE-ADDRESS NS   PPC ADD    ( make PPC absolute )
+NEXT                             ( B return ; exit [0] )
+
+rcode JUMP                       (  points back 5 instr. )
+
+code WEG
+ PS PS #2 IM ADD                 (  PS+=2 )
+NEXT
+
+code PWEG
+ PS PS #4 IM ADD                 ( PS+=4 )
+NEXT
+
+code @   ( @   Get word at addr on stack; place word on stack )
+  PS #0  [+]   r0 LDB          ( read lsb @PS )
+  PS #1  [+]   r1 LDB          ( read msb @PS+1)
+  r0 r1 #8 LSL r0 ADD
+  r0 BASE-ADDRESS NS [+R]! r1 LDB ( peek lsb;  r0=@{MEM+r0} )
+  PS #0 [+]    r1 STB          ( write lsb @PS )
+  r0 #1 [+]    r1 LDB          ( peek msb )
+  PS #1 [+]    r1 STB          ( write msb @PS+1 )
+NEXT
+
+code @B  (  Get byte at address on stack; place byte on stack )
+  PS #0  [+]   r0 LDB          ( read lsb @PS )
+  PS #1  [+]   r1 LDB          ( read msb @PS+1)
+  r0 r1 #8 LSL r0 ADD
+  r0 BASE-ADDRESS NS [+R] r0 LDB ( peek lsb r0=@{MEM+r0} )
+  PS #0 [+]    r0 STB          ( write lsb @PS )
+  #0 IM        r0 MOV          ( msb=0 )
+  PS #1 [+]    r0 STB          ( write msb @PS+1 )
+NEXT
+
+code ! ( !  put word on stack at address on stack )
+ PS #1  []+    r1 LDB          ( get addr lsb; PS+=1 )
+ PS #1  []+    r2 LDB          ( get addr msb; PS+=1 )
+ r1 r2 #8 LSL  r1 ADD          ( address in r1 )
+
+ PS #1  []+    r0 LDB          ( get word lsb @PS; PS+=1 )
+ r1  BASE-ADDRESS NS [+R] r0 STB
+
+ r1 #1 IM r1 ADD               ( increment address )
+ PS #1 []+    r0 LDB           ( get word msb@ PS; PS+=1 )
+ r1  BASE-ADDRESS NS [+R] r0 STB
+NEXT
+
+code !B ( Poke byte on stack to address on stack   )
+ PS #1  []+    r1 LDB          ( get addr lsb; PS+=1 )
+ PS #1  []+    r2 LDB          ( get addr msb; PS+=1 )
+ r1 r2 #8 LSL  r1 ADD          ( address in r1 )
+
+ PS #2  []+    r0 LDB          ( byte in r0  PS +=2 )
+ r1  BASE-ADDRESS NS [+R] r0 STB  ( store the byte )
+NEXT
+
+code >>>   ( Field Transport )
+  ( <source addr> <dest addr> <n>  >>>    1-256 bytes       )
+  ( This coding mimics the 1802 assembler definition        )
+  ( Thus n=0 copies 256 bytes etc ...                       )
+  (    n    copies        n    copies                       )
+  (   -1    255           255    255                        )
+  (    0    256           256    256                        )
+  (    1      1           257      1 etc                    )
+
+ PS #2 []+     r4  LDB  (  pull lsb  PS+=2 )
+                        ( r4 = number of bytes )
+ PS #1 []+     r1  LDB  ( pull lsb  incr PS )
+ PS #1 []+     r0  LDB  ( pull msb  incr PS )
+ r1  r0 #8 LSL r1  ADD  ( r1 = destination addr )
+
+ PS #1 []+     r6  LDB  ( pull lsb  incr PS )
+ PS #1 []+     r0  LDB  ( pull msb  incr PS )
+ r6  r0 #8 LSL r6  ADD  ( r6 = course addr )
+
+ BASE-ADDRESS r6 NS r6 ADD ( init memory pointers )
+
+ BEGIN  ( A )
+   r6 #1 []+ r0 LDB      ( x. get source byte    r6=+=1 )
+   r1 BASE-ADDRESS NS [+R] r0 STB ( store byte )
+   r1  #1 IM   r1  ADD   ( incr dest address )
+   r4  #1 IM   r4  SUB   ( r4 = no. bytes )
+   r4  #FF IM  r4 ~F AND ( 1 byte counter )
+ Z END ( NZ jump A )
+NEXT
+
+code +  (  add two words on stack; result to stack )
+
+PS  #1 []+  r1 LDB              ( LDRB    r1,[PS],#1     )
+PS  #1 []+  r2 LDB              ( LDRB    r2,[PS],#1     )
+                                (                        )
+PS  #0 [+]  r3 LDB              ( LDRB    r3,[PS]        )
+PS  #1 [+]  r4 LDB              ( LDRB    r4,[PS,#1]     )
+                                (                        )
+r3  r1  NS  r0 ADD              ( ADD     r0,r3,r1       )
+PS  #0 [+]  r0 STB              ( STRB    r0,[PS]        )
+                                (                        )
+r2  r0 #8 LSR r2 ADD            ( ADD     r2,r2,r0,LSR#8 )
+r4  r2  NS    r0 ADD            ( ADD     r0,r4,r2       )
+PS  #1 [+]    r0 STB            ( STRB    r0,[PS,#1]     )
+NEXT
+
+code -  (  sub two words on stack; result to stack )
+
+PS  #1 []+  r1 LDB              ( LDRB    r1,[PS],#1     )
+PS  #1 []+  r2 LDB              ( LDRB    r2,[PS],#1     )
+                                (                        )
+PS  #0 [+]  r3 LDB              ( LDRB    r3,[PS]        )
+PS  #1 [+]  r4 LDB              ( LDRB    r4,[PS,#1]     )
+                                (                        )
+r3  r1  NS  r0 SUB              ( SUB     r0,r3,r1       )
+PS  #0 [+]  r0 STB              ( STRB    r0,[PS]        )
+                                (                        )
+r2  r0 #8 LSR r2 SUB            ( SUB     r2,r2,r0,LSR#8 )
+r4  r2  NS    r0 SUB            ( SUB     r0,r4,r2       )
+PS  #1 [+]    r0 STB            ( STRB    r0,[PS,#1]     )
+NEXT
+
+code DUP
+  PS #1 [+]   r0 LDB          ( copy PS+1 to PS-1; PS-=1 )
+  PS #1 [-]!  r0 STB
+  PS #1 [+]   r0 LDB          ( and do it 2 times i.e. 1 word )
+  PS #1 [-]!  r0 STB
+NEXT
+
+code PDUP
+  PS #3 [+]   r0 LDB          ( copy PS+3 to PS-1; PS-=1 )
+  PS #1 [-]!  r0 STB
+  PS #3 [+]   r0 LDB          ( and do it 4 times i.e. 2 words )
+  PS #1 [-]!  r0 STB
+ hier  $OC                    (  entry for ZWO )
+  PS #3 [+]   r0 LDB
+  PS #1 [-]!  r0 STB
+  PS #3 [+]   r0 LDB
+  PS #1 [-]!  r0 STB
+NEXT
+
+code ZWO  (  <n> <m> ----> <n> <m> <n>  )
+NEVER END  (  jump to zwo entry in pdup )
+
+code VERT  ( <n> <m>  ---> <m> <m> )
+  PS  #0 [+]  r0 LDB   ( swap @PS with PS+2 via r0  )
+  PS  #2 [+]  r1 LDB
+  PS  #0 [+]  r1 STB
+  PS  #2 [+]  r0 STB
+
+  PS  #1 [+]  r0 LDB   ( swap @PS+1 with PS+3 via r0  )
+  PS  #3 [+]  r1 LDB
+  PS  #1 [+]  r1 STB
+  PS  #3 [+]  r0 STB
+NEXT
+
+code RDU ( <c> <b> <a>  ---> <a> <c> <b> "bottom Up" )
+  PS  #0 [+]  r0  LDB   ( rotate lsbytes )
+  PS  #2 [+]  r1  LDB   ( using r0 as temporary site )
+  PS  #0 [+]  r1  STB
+  PS  #4 [+]  r1  LDB
+  PS  #2 [+]  r1  STB
+  PS  #4 [+]  r0  STB
+
+  PS  #1 [+]  r0  LDB   ( rotate msbytes )
+  PS  #3 [+]  r1  LDB   ( using r0 as temporary site )
+  PS  #1 [+]  r1  STB
+  PS  #5 [+]  r1  LDB
+  PS  #3 [+]  r1  STB
+  PS  #5 [+]  r0  STB
+NEXT
+
+code RDO ( <c> <b> <a>  ---> <b> <a> <c> "top dOwn" )
+  PS  #0 [+]  r0  LDB   ( rotate lsbytes )
+  PS  #4 [+]  r1  LDB   ( using r0 as temporary site )
+  PS  #0 [+]  r1  STB
+  PS  #2 [+]  r1  LDB
+  PS  #4 [+]  r1  STB
+  PS  #2 [+]  r0  STB
+
+  PS  #1 [+]  r0  LDB   ( rotate msbytes )
+  PS  #5 [+]  r1  LDB   ( using r0 as temporary site )
+  PS  #1 [+]  r1  STB
+  PS  #3 [+]  r1  LDB
+  PS  #5 [+]  r1  STB
+  PS  #3 [+]  r0  STB
+NEXT
+
+code I                       ( index )
+  RS #1 [+]   r0 LDB          ( get RS+1 )
+  PS #1 [-]!  r0 STB          ( push to stack )
+  RS #0 [+]   r0 LDB          ( get RS )
+  PS #1 [-]!  r0 STB          ( push to stack )
+NEXT
+
+code S>R
+  PS #1 []+  r0 LDB           ( get @ PS; PS+=1 )
+  RS #2 [-]! r0 STB           ( push to return stack )
+  PS #1 []+  r0 LDB           ( get @ PS; PS+=1 )
+  RS #1 [+]  r0 STB           ( push to return stack )
+NEXT
+
+code R>S
+  RS #1 []+  r0 LDB           ( get @ RS; RS+=1 )
+  PS #2 [-]! r0 STB           ( push to stack )
+  RS #1 []+  r0 LDB           ( get @ RS; RS+=1 )
+  PS #1 [+]  r0 STB           ( push to stack )
+NEXT
+
+code =0
+  PS #0 [+]     r1 LDB     ( read lsb @ps )
+  PS #1 [+]     r2 LDB     ( read msb @ps+1 )
+  r1 r2 NS   r0 ~F ORR     ( OR r1,r2 -> r0 )
+  Z Y? hier $OC vert ( A )  #1 IM r0 MOV  ( return 1 )
+    N: hier $OC vert ( B )  #0 IM r0 MOV  ( return 0 )
+    TH hier $OC      ( C )
+  PS #0 [+]     r0 STB     ( write lsb @ps )
+  #0 IM         r0 MOV     ( r0=0 )
+  PS #1 [+]     r0 STB     ( write msb @ps+1 )
+NEXT                       ( A B C on assembler stack )
+
+code <0
+  PS #1 [+]     r0 LDB     ( read msb @ps+1 )
+  r0 #80 IM  r0 ~F AND     ( test sign bit )
+         dup
+  NZ END                   ( >=0 jump to C r0=0 )
+         rdu zwo
+NEVER   END                ( neg; jump to A )
+                           ( C A B on assembler stack )
+code >0
+  PS #1 [+]     r2 LDB     ( read msb @ps+1 )
+  #80 IM        r2 ~AND    ( TST sign bit )
+         dup
+  Z END  rdu               ( neg; jump to B )
+  PS #0 [+]     r1 LDB     ( read lsb @ps )
+  r1 r2 NS  r0 ~F ORR      ( OR r1,r2 -> r0 )
+         dup
+  Z END  vert              ( >0 jump to A )
+  NEVER END                ( =0 jump to C )
+                           ( B A on assembler stack )
+
+code >=U       ( test for greater or equal to unsigned) )
+  PS  #1 []+   r1  LDB  ( pull lsb  incr PS )
+  PS  #1 []+   r6  LDB  ( pull msb  incr PS )
+  r1 r6 #8 LSL r1  ADD  ( combine )
+  PS #0 [+]     r0 LDB  ( read lsb @ps )
+  PS #1 [+]     r6 LDB  ( read msb @ps+1 )
+  r0 r6 #8 LSL  r0 ADD   ( combine )
+  r1       NS   r0 ~SUB  ( test )
+  LT END     ( >=0 jump to A )
+  NEVER END  (  <0 jump to B )
+
+code F-VERGL   ( field comparison )
+ ( <addr1> <addr2> <bytes> F-VERGL )
+ ( bytes = 1-256                   )
+
+  PS  #2 []+   r1  LDB   ( pull lsb only PS+=2 )
+                         ( r1 = number of bytes )
+  PS  #1 []+   r0  LDB   ( pull lsb  incr PS )
+  PS  #1 []+   r6  LDB   ( pull msb  incr PS )
+  r0 r6 #8 LSL r2  ADD   ( combine    r2 = addr2 )
+  r2 BASE-ADDRESS NS r2 ADD ( abs addr2 )
+
+  PS #0 [+]     r0 LDB  ( read lsb @ps )
+  PS #1 [+]     r6 LDB  ( read msb @ps+1 )
+  r0 r6 #8 LSL  r3 ADD   ( combine    r3 = addr1 )
+  r3 BASE-ADDRESS NS r3 ADD ( abs addr1 )
+
+  #1 IM         r0 MOV   ( equality token )
+  BEGIN
+  r3 #1 []+     r4  LDB  ( get byte 1    addr1+=1 )
+  r2 #1 []+     r5  LDB  ( get byte 2    addr2+=1 )
+  r5         NS r4  ~SUB
+  GT Y?-> #2 IM r0  MOV  ( a>b token )
+  LT Y?-> #0 IM r0  MOV  ( a<b token )
+
+  #1  IM r1     r1  SUB   ( r1-=1 )
+  #FF IM r1     r1 ~F AND  ( 1 byte counter )
+  Z END
+
+  PS #0 [+]     r0 STB     ( write lsb @ps )
+  #0 IM         r0 MOV     ( r0=0 )
+  PS #1 [+]     r0 STB     ( write msb @ps+1 )
+NEXT
+
+code NICHT    ( Invert word on stack )
+     #FF IM   r1 MOV
+  PS  #0 [+]  r0 LDB   ( read @ps lsb )
+   r0  r1 NS  r0 EOR   ( r0 = NOT r0 )
+  PS  #0 [+]  r0 STB   ( write lsb )
+  PS  #1 [+]  r0 LDB   ( read @ps msb )
+   r0  r1 NS  r0 EOR   ( r0 = NOT r0 )
+  PS  #1 [+]  r0 STB   ( write msb )
+NEXT
+
+code UND     ( Logical AND words on stack )
+  PS  #1 []+  r1  LDB  ( pull lsb  incr PS )
+  PS  #1 []+  r2  LDB  ( pull msb  incr PS )
+  PS  #0 [+]  r0  LDB  ( read lsb )
+  r0  r1 NS   r0  AND  (  and lsb s )
+  PS  #0 [+]  r0  STB  ( write lsb )
+  PS  #1 [+]  r0  LDB  ( read msb )
+  r0  r2 NS   r0  AND  ( and msb s )
+  PS  #1 [+]  r0  STB  ( write msb )
+NEXT
+
+code ODER     ( Logical OR words on stack )
+  PS  #1 []+  r1  LDB  ( pull lsb  incr PS )
+  PS  #1 []+  r2  LDB  ( pull msb  incr PS )
+  PS  #0 [+]  r0  LDB  ( read lsb )
+  r0  r1 NS   r0  ORR  (  or lsb s )
+  PS  #0 [+]  r0  STB  ( write lsb )
+  PS  #1 [+]  r0  LDB  ( read msb )
+  r0  r2 NS   r0  ORR  ( or msb s )
+  PS  #1 [+]  r0  STB  ( write msb )
+NEXT
+
+code EXO     ( Logical EOR words on stack )
+  PS  #1 []+  r1  LDB  ( pull lsb  incr PS )
+  PS  #1 []+  r2  LDB  ( pull msb  incr PS )
+  PS  #0 [+]  r0  LDB  ( read lsb )
+  r0  r1 NS   r0  EOR  (  or lsb s )
+  PS  #0 [+]  r0  STB  ( write lsb )
+  PS  #1 [+]  r0  LDB  ( read msb )
+  r0  r2 NS   r0  EOR  ( or msb s )
+  PS  #1 [+]  r0  STB  ( write msb )
+NEXT
+
+code BIT  ( Set mask for bit of word specified )
+           ( Mask is all zeroes with bit specified set to 1.)
+           (  <n> BIT )
+           (  <mask, only 1 bit set to 1> )
+  PS  #0 [+]  r1  LDB  ( read lsb @ps )
+      #1 IM   r0  MOV  ( set bit 0  =#1 )
+  r0  r1 RSS LSL  r0  MOV  ( shift left r1 places )
+  PS  #0 [+]  r0  STB  ( write lsb @ps )
+  r0  #8 LSR  r0  MOV  ( get msb )
+  PS  #1 [+]  r0  STB  ( write msb )
+NEXT
+
+code LOOPEX    ( Loop executive  increment =1 )
+  #1  IM        r1 MOV     ( r1=1 increment for loopex )
+  hier $OC                ( .lpxp entry from +loopex r1 = incr )
+                           ( pull index from RS )
+  RS #1 []+     r2  LDB    ( lsb )
+  RS #1 []+     r0  LDB    ( msb )
+  r2 r0 #8 LSL  r2  ADD    ( combine r2 = index )
+  r2 r1    NS   r2  ADD    ( index += increment )
+
+  hier $OC                 ( .lpxj )
+                           ( on entry here r2 = current index )
+                           ( read "looplimit" @RS )
+  RS #0 [+]     r1  LDB    ( lsb )
+  RS #1 [+]     r0  LDB    ( msb )
+  r1 r0 #8 LSL  r1  ADD    ( combine  r1 = looplimit )
+
+  r1 r2    NS   r1 ~F SUB  ( looplimit-index )
+  GE Y?                    ( loop complete? )
+    RS #2 [-]!    r2  STB  ( n. push index back to RS )
+    r2    #8 LSR  r2  MOV  ( get msb )
+    RS #1 [+]     r2  STB  ( put msb )
+                           ( PPC = peek[PPC]  )
+    PPC #0 [+]    r1  LDB  ( lsb  @PPC )
+    PPC #1 [+]    r0  LDB  ( msb  @PPC )
+    r1 r0 #8 LSL PPC  ADD  ( combine; i.e. jump )
+    PPC BASE-ADDRESS NS PPC ADD ( make PPC absolute addr )
+    NEXT
+  TH                       ( y. loop cpmplete )
+  RS   #2 IM    RS  ADD    ( Discard looplimit off RS )
+  PPC  #2 IM   PPC  ADD    ( Jump 1 word and exit )
+NEXT
+
+
+code +LOOPEX    ( Loop executive variable increment )
+  ( Pull increment off PS; but use 1 if LOOPEX )
+                           ( pull increment from PS )
+  PS #1 []+     r1  LDB    ( lsb )
+  PS #1 []+     r0  LDB    ( msb )
+  r1 r0 #8 LSL  r1  ADD    ( combine r1 = increment )
+vert NEVER END             ( branch to .lpxp )
+
+
+code $JEEX     (  JE execute )
+  ( On exit; r2 = current index      )
+  (          RS   points to looplimit )
+   ( Read PPC = peek[PPC] in case loop is premature )
+  PPC #0 [+]    r1  LDB  ( lsb  @PPC )
+  PPC #1 [+]    r0  LDB  ( msb  @PPC )
+  r1 r0 #8 LSL PPC  ADD  ( combine; i.e. jump )
+  PPC BASE-ADDRESS NS PPC ADD ( make PPC absolute addr )
+
+   ( Pull looplimit from PS and push to RS              )
+  PS #1 []+     r0  LDB  ( pull lsb looplimit from PS )
+  RS #2 [-]!    r0  STB  ( push to RS )
+  PS #1 []+     r1  LDB  ( pull msb )
+  RS #1 [+]     r1  STB  ( push msb to RS )
+  r0 r1 #8 LSL  r1  ADD  ( combine r1 = looplimit )
+
+   ( Pull initial index from PS (pushed to RS at .lpxj  )
+  PS #1 []+     r0  LDB  ( pull lsb index from PS )
+  PS #1 []+     r2  LDB  (      msb )
+  r0 r2 #8 LSL  r2  ADD  ( combine r2 = index )
+NEVER END                ( branch to .lpxj in loopex )
+
+code P*  ( UNSIGNED multiply.  16 bit x 16 bit -> 32 bit )
+    ( Reads two numbers on the stack and returns their 32 bit )
+    ( product on the stack.  PS unchanged.                    )
+
+  PS #2  [+]    r0  LDB ( read lsb  num1 )
+  PS #3  [+]    r1  LDB ( read msb       )
+  PS #0  [+]    r2  LDB ( read lsb  num2 )
+  PS #1  [+]    r3  LDB ( read msb       )
+  r0 r1 #8 LSL  r1  ADD ( combine     r1 = num1 )
+  r2 r3 #8 LSL  r2  ADD ( combine     r2 = num2 )
+        r1  r2  r0  MUL ( multipy 16x16 -> 32 )
+  r0    #8 LSR  r1  MOV ( align the bytes to lsb )
+  r0   #10 LSR  r2  MOV (  )
+  r0   #18 LSR  r3  MOV (  )
+  PS #2 [+]     r0  STB ( write byte 0  lsw lsb @PS+2 )
+  PS #3 [+]     r1  STB ( write byte 1  lsw msb @PS+3 )
+  PS #0 [+]     r2  STB ( write byte 2  msw lsb @PS   )
+  PS #1 [+]     r3  STB ( write byte 3  msw msb @PS+1 )
+NEXT
+
+code P/MOD    ( 32 bit Numerator / 16 bit divisor  UNSIGNED  )
+  ( Divides a 32 bit positive word by a 16 bit positive word, )
+  ( produces 16 bit quotient and 16 bit remainder.            )
+  ( If the quotient overflows it is set to #FFFF.             )
+  ( <n, least sig. 16 bits> <n, most sig. 16 bits> <m> P/MOD  )
+  ( <quotient n/m> <remainder n/m>                            )
+
+  PS #1 []+     r2  LDB ( pull lsb PS+=1  )
+  PS #1 []+     r0  LDB ( pull msb  PS+=1 )
+  r2 r0 #8 LSL  r2  ADD ( combine         )
+  r2   #10 LSL  r2  MOV ( align with msw r2 = Divisor 16 bit )
+
+  PS #0 [+]     r1  LDB  ( read lsb   read@PS   )
+  PS #1 [+]     r0  LDB  ( read msb             )
+  r1 r0 #8 LSL  r1  ADD  ( combine    r1 =  msw )
+
+  PS #2 [+]     r3  LDB  ( read lsb              )
+  PS #3 [+]     r0  LDB  ( read msb              )
+  r3 r0 #8 LSL  r0  ADD  ( combine    r0 =  lsw  )
+
+  r0 r1 #10 LSL r1  ADD  ( combine msw,lsw r1=Numer. 32 bit )
+
+                         ( num is     r1 )
+                         ( divisor is r2 )
+  #1 16 R.IM    r3  MOV  ( place counter  r3 )
+  #0 IM         r4  MOV  ( quotient       r4 )
+  BEGIN                  ( Division loop )
+            r1 r2 NS ~SUB   ( N >= D ?    )
+    C  Y?-> r4 r3 NS r4 ORR ( Q += place  )
+    C  Y?-> r1 r2 NS r1 SUB ( N  -= D     )
+    r2 #1 LSR     r2  MOV   ( D >>> 1     )
+    r3 #1 LSR     r3 ~F MOV ( p >>> 1     )
+  Z  END
+       ( Check for overflow.                                )
+       ( For D' >= 2N, quotient always evaluates to &1FFFF  )
+       ( but for N <= D' < 2N it's &1xxxx where D' = D<<16. )
+       ( So we need to test bit 16.                         )
+
+  #1 16 R.IM    r4 ~AND  ( is bit 16 set?   )
+  NZ Y?-> #0 IM r4  MVN  ( y. set quot = -1 )
+  NZ Y?-> #0 IM r1  MVN  ( y. set rem  = -1 )
+
+  r4 #8 LSR     r0  MOV  ( write quotient r4;  )
+  PS #3 [+]     r0  STB  ( msb                 )
+  PS #2 [+]     r4  STB  ( lsb                 )
+
+  r1 #8 LSR     r0  MOV  ( write remainder r1 )
+  PS #1 [+]     r0  STB  ( msb                )
+  PS #0 [+]     r1  STB  (  )
+NEXT
+
+code $TUE       (  Execute code at <addr> )
+   (  <addr> $TUE  executes code at addr)
+   (  So  ' WORD $TUE  <=>  WORD        )
+   (  hp% = pull_ps  GOTO exec          )
+  PS  #1 []+    HP  LDB     ( pull lsb  incr PS )
+  PS  #1 []+    r0  LDB     ( pull msb  incr PS )
+  HP r0 #8 LSL  HP  ADD     ( combine           )
+  HP BASE-ADDRESS NS HP ADD ( make HP absolute addr )
+  r14  #14 IM   r15 SUB   ( i.e. return to emulator five )
+                          ( instructions earlier than normal )
+
+code $POLYNAME    ( name hasher )
+  ( r% = B%<<16  EOR  A%<<8  EOR D%        Combine  0 B A D )
+  ( c% = X% EOR r% EOR r%>>>1 EOR r%>>>2 EOR r%>>>7         )
+  ( r% = r% EOR c%<<24                    add in MS byte    )
+  ( r% = r%>>>7                                             )
+  ( B% = r%>>>16 AND &FF                  Split up          )
+  ( A% = r%>>>8  AND &FF                                    )
+  ( D% = r%      AND &FF                                    )
+
+  PS #2 []+      r3  LDB   ( pull lsb  PS+=2   r3 = X )
+
+  PS #0 [+]      r4  LDB   ( read lsb at PS+0  r4 = D )
+  PS #2 [+]      r2  LDB   ( read lsb at PS+2  r2 = B )
+  PS #3 [+]      r1  LDB   ( read msb at PS+3  r1 = A )
+
+  r4 r1  #8 LSL  r5  EOR   ( r%= B%<<16  EOR  A%<<8  EOR D% )
+  r5 r2 #10 LSL  r5  EOR   ( i.e. build word  r5 = 0,B,A,D  )
+                           ( r1,2,4 free )
+  r3 r5      NS  r0  EOR   ( c% = X% EOR r% EOR r%>>>1 EOR  )
+  r0 r5  #1 LSR  r0  EOR   (         r%>>>2 EOR r%>>>7 )
+  r0 r5  #2 LSR  r0  EOR   ( only 8 LS bits are significant )
+                           ( r3 free )
+  r0 r5  #7 LSR  r0  EOR
+
+  r5 r0 #18 LSL  r5  EOR   ( r% = r% EOR c%<<24 ; r4= C,B,A,D )
+
+  r5  #7 LSR     r4  MOV   ( shift Right 7. r4 =  x,B',A',D )
+      #0  IM     r3  MOV   ( break into bytes               )
+  r4 #10 LSR     r2  MOV   ( B                              )
+  r4  #8 LSR     r1  MOV   ( A                              )
+
+  PS  #0 [+]     r4  STB   (  D  replace in stack  )
+  PS  #1 [+]     r3  STB   ( #0                    )
+  PS  #2 [+]     r2  STB   (  B                    )
+  PS  #3 [+]     r1  STB   (  A                    )
+NEXT
+
+code CHS  ( Change sign of number on the stack. )
+          ( Do this by subtracting from 0 )
+
+  PS #0 [+]      r1  LDB   ( read lsb at PS+0 )
+  PS #1 [+]      r2  LDB   ( read msb at PS+1 )
+       r1 #0 IM  r0  RSB   ( change sign; r0=#0-r1 )
+  PS #0 [+]      r0  STB   ( replace lsb )
+  r2 r0 #8 LSR   r2  SUB   ( r0>>8 is "borrow" )
+       r2 #0 IM  r0  RSB   ( change sign; r0=#0-r1 )
+  PS #1 [+]      r0  STB   ( replace msb )
+NEXT
+
+code CYC2  ( AMSAT CRC division )
+            ( called         <seed> <byte> CYC2  )
+            ( returns        <seed>              )
+
+  PS #2 []+      r1  LDB   ( r1 = byte pull lsb ; PS+=2 )
+
+  PS #0 [+]      r6  LDB   ( read crcc msb at PS+0 )
+  PS #1 [+]      r0  LDB   ( read crcc lsb at PS+1 )
+  r0 r6  #8 LSL  r0  ADD   ( r0 = crcc : note order ! )
+
+ ( R0 Format;  [byte] [xxxx] [crccH] [crccL] )
+
+  r0 #FF 8 R.IM   r0 BIC   ( clear top byte of crcc register )
+  r0 r1  24 LSL   r0 ORR   ( merge new byte with seed )
+         #8 IM    r1 MOV   ( set up count of 8 )
+  BEGIN
+     r0  16 LSL   r0 ~EOR  ( eor byte with crcc )
+     r0   1 LSL   r0  MOV  ( left shift byte and crcc )
+     NEG Y?-> r0 #10 24 R.IM r0 EOR  ( EOR crcc with &1021 )
+     NEG Y?-> r0 #21      IM r0 EOR  ( - if N flag set     )
+     r1  #1 IM  r1 ~F SUB   ( decrement count, setting flags )
+  LE END
+
+  PS #1 [+]      r0  STB    ( write crcc lsb )
+  r0  8 LSR      r0  MOV    ( get msb )
+  PS #0 [+]      r0  STB    ( write crcc msb )
+NEXT
+
+code $PSHOLEN
+ ( returns the stack pointer )
+ PS BASE-ADDRESS NS r0 SUB
+ r0 #8 LSR  r1 MOV  ( word is in r0.  r0 preserved )
+ PS #1 [-]! r1 STB  ( push msb, decr PS )
+ PS #1 [-]! r0 STB  ( push lsb  decr PS )
+NEXT
+
+code $PSSETZEN
+  ( takes a number off stack, and sets sp to this number )
+ PS  #1 []+    r0  LDB  ( pull lsb  incr PS )
+ PS  #1 []+    r1  LDB  ( pull msb  incr PS )
+ r0  r1 #8 LSL r0  ADD  ( number in r0 )
+ BASE-ADDRESS r0 NS PS ADD  ( absolute address )
+NEXT
+
+code W/DECODE
+(  Threshold decoder.  Takes 6-byte seed + 1 word      )
+(   i.e. byte+parity and returns seed + 1 decoded byte )
+
+( Load seed and data registers from stack. Order is, )
+( PS increasing,  B PV D1 D2 D3 S1 S2 S3             )
+  PS  #0  [+]   r2 LDB                           ( read B  )
+  PS  #2  [+]   r0 LDB   r2  r0  8 LSL r2 ORR    ( D1 -> D )
+  PS  #3  [+]   r0 LDB   r2  r0 16 LSL r2 ORR    ( D2 -> D )
+  PS  #4  [+]   r0 LDB   r2  r0 24 LSL r2 ORR    ( D3 -> D )
+
+  PS  #5  [+]   r0 LDB       r0  8 LSL r1 MOV    ( S1 -> S )
+  PS  #6  [+]   r0 LDB   r1  r0 16 LSL r1 ORR    ( S2 -> S )
+  PS  #7  [+]   r0 LDB   r1  r0 24 LSL r1 ORR    ( S3 -> S )
+
+  PS  #1  [+]   r0 LDB                           ( read PV )
+
+  ( decoder )
+  ( s  = D>>18 EOR D>>12 EOR D>>4 EOR D EOR PV )
+  r0  r2 NS      r0 EOR      r0  r2  4 LSR  r0 EOR
+  r0  r2 12 LSR  r0 EOR      r0  r2 18 LSR  r0 EOR
+      r0 #FF IM  r0 AND  ( mask LSB of s )
+  r1  r0     NS  r1 ORR  ( S = S + s )
+
+         #8  IM  r4 MOV  ( bit loop; 8 downcounting )
+  BEGIN  ( :A )
+      r1 #1 LSL  r1    MOV ( shift S left )
+      r2 r2 NS   r2 ~F ADD ( shift D left - 5 byte shift )
+      r3 r3 NS   r3    ADC ( D4; decoded byte )
+
+         #0 IM   r0 MOV         ( count specific bits in S )
+         #1   6 R.IM  r1 ~AND   ( bit 18  <<8 )
+     NZ Y?-> r0 #1  IM r0 ADD   ( r0 += 1 )
+         #1  10 R.IM  r1 ~AND   ( bit 22  <<8 )
+     NZ Y?-> r0 #1  IM r0 ADD
+         #1  18 R.IM  r1 ~AND   ( bit 14  <<8 )
+     NZ Y?-> r0 #1  IM r0 ADD
+         #1  24 R.IM  r1 ~AND   ( bit 8   <<8 )
+     NZ Y?-> r0 #1  IM r0 ADD
+
+               #3 IM  r0 ~SUB   ( count >= 3?  )
+
+     GE Y?-> r2  #1  6 R.IM r2 EOR  ( Correct output bit )
+     GE Y?-> r1 #41 24 R.IM r1 EOR  ( Flip syndrome reg bits )
+     GE Y?-> r1 #11 10 R.IM r1 EOR  ( 18,14,6,0  << 8 )
+
+     r4 #1 IM r4 ~F SUB             ( all bits done? )
+  LE END  ( GT n. goto :A )
+
+( write back seed and data register to stack )
+      r1 24 LSR r0 MOV    PS #7 [+]  r0 STB  ( write S3 @PS+7 )
+      r1 16 LSR r0 MOV    PS #6 [+]  r0 STB  ( write S2 @PS+6 )
+      r1  8 LSR r0 MOV    PS #5 [+]  r0 STB  ( write S1 @PS+5 )
+
+      r2 24 LSR r0 MOV    PS #4 [+]  r0 STB  ( write D3 @PS+4 )
+      r2 16 LSR r0 MOV    PS #3 [+]  r0 STB  ( write D2 @PS+3 )
+      r2  8 LSR r0 MOV    PS #2 [+]  r0 STB  ( write D1 @PS+2 )
+
+      #0 IM     r0 MOV    PS #1 [+]  r0 STB  ( write  0 @PS+1 )
+                          PS #0 [+]  r3 STB  ( write D5 @PS+0 )
+NEXT  ( end of threshold decoder )
+
+         ( Maths extensions and Trig core )
+
+code P-
+( Sub two 32 bit numbers on the stack )
+( ----------------------------------- )
+( Entry - <ls word A>  <ms word A>  <ls word B>  <ms word B> )
+( Exit  - <ls word A-B> <ms word A-B> )
+
+#1 IM r0 ~F MOV    ( semaphore for sub )
+NEVER Y?  (  jump to " TH "  in P+ code)
+
+code P+
+( Add two 32 bit numbers on the stack )
+( ----------------------------------- )
+( Entry - <ls word A>  <ms word A>  <ls word B>  <ms word B> )
+( Exit  - <ls word A+B> <ms word A+B> )
+
+  #0 IM r0 ~F MOV   ( semaphore for add )
+        TH          (  entry for P- )
+  PS #1 []+  r1  LDB  ( pull lsb  ms word B )
+  PS #1 []+  r2  LDB  ( pull msb  ms word B )
+  PS #1 []+  r3  LDB  ( pull lsb  ls word B )
+  PS #1 []+  r4  LDB  ( pull msb  ls word B )
+
+  r1  r2 #8 LSL  r0   ADD  ( combine bytes to form B )
+  r4  r0 #8 LSL  r0   ADD
+  r3  r0 #8 LSL  r0   ADD
+
+  PS #0 [+]  r1  LDB  ( read lsb  ms word A )
+  PS #1 [+]  r2  LDB  ( read msb  ms word A )
+  PS #2 [+]  r3  LDB  ( read lsb  ls word A )
+  PS #3 [+]  r4  LDB  ( read msb  ls word A )
+
+  r1  r2 #8 LSL  r1  ADD  ( combine bytes to form A )
+  r4  r1 #8 LSL  r1  ADD
+  r3  r1 #8 LSL  r1  ADD
+
+   Z Y?-> r1 r0 NS r0 ADD  ( either add two 32-bit words )
+  NZ Y?-> r1 r0 NS r0 SUB  ( or     sub                  )
+
+  PS #2 [+] r0 STB     r0 #8 ASR r0 MOV ( write lsb ls word )
+  PS #3 [+] r0 STB     r0 #8 ASR r0 MOV ( write lsb ls word )
+  PS #0 [+] r0 STB     r0 #8 ASR r0 MOV ( write lsb ls word )
+  PS #1 [+] r0 STB                      ( write lsb ls word )
+
+NEXT
+
+code 3V3
+  ( Swaps two triples on the stack   )
+  ( ------------------------------   )
+  ( Use      < A B C   D E F > 3V3   )
+  ( Returns  < D E F   A B C >       )
+
+  PS #6 IM  r2  ADD   ( r2 points to last item+1 )
+  BEGIN
+    PS  #0 [+]   r0  LDB  ( get byte a )
+    PS  #6 [+]   r1  LDB  ( get destination contents {b} )
+    PS  #6 [+]   r0  STB  ( replace with byte a )
+    PS  #1 []+   r1  STB  ( replace b where a was; PS+=1 )
+    r2  NS       PS ~SUB  ( all done? )
+    GE END
+    PS  #6 IM PS SUB      ( y. restore stack pointer )
+NEXT
+
+ (  RP-LOOP   rectangular to polar conversion  )
+ (  -----------------------------------------  )
+ (  Stack contents:                            )
+ (  Entry  0          On Exit     Y            )
+ (         Y                      X  ~0        )
+ (         X                      T            )
+ (         T                                   )
+ (                                             )
+ (  TR-LOOP   theta rotation                   )
+ (  ------------------------                   )
+ (  Stack contents:                            )
+ (  Entry  0          On Exit     Y            )
+ (         Y                      X            )
+ (         X                      T  ~0        )
+ (         T                                   )
+ (  ----------------------------------------   )
+
+code RP-LOOP
+ #0 IM r5 MOV   ( rp flag )
+ NEVER Y?       ( jump to TRIG_LOAD)
+
+  64 feld T-LIST   ( ATN 2^-j , j=0-15 )
+  #0000 #2000    #051E #12E4    #385B #9FB    #11D4  #511
+  #0D43  #28B    #D7E1  #145    #F61E  #A2    #7C55   #51
+  #BE53   #28    #5F2F   #14    #2F98   #A    #17CC    #5
+  #8BE6    #2    #45F3    #1    #A2FA   #0    #517D    #0
+  'n T-LIST #2 +n $OC 32 !fk
+
+code TR-LOOP
+ #0 IM r5 MVN           ( tr flag )
+       TH ( TRIG_LOAD ) ( load registers from stack )
+ PS #2 []+     r0  LDB  ( read lsb  PS+=2 {trash J} )
+ PS #1 [-]     r6  LDB  ( read msb )
+ r0 r6 #8 LSL  r0  ADD  ( combine     r0 = J {should be 0!!} )
+
+ PS #0 [+]     r1  LDB  ( read lsb )
+ PS #1 [+]     r6  LDB  ( read msb )
+ r1 r6 #8 LSL  r1  ADD  ( combine     r1 = Y )
+
+ PS #2 [+]     r2  LDB  ( read lsb )
+ PS #3 [+]     r6  LDB  ( read msb )
+ r2 r6 #8 LSL  r2  ADD  ( combine     r2 = X )
+
+ PS #4 [+]     r3  LDB  ( read lsb )
+ PS #5 [+]     r6  LDB  ( read msb )
+ r3 r6 #8 LSL  r3  ADD  ( combine     r3 = T )
+
+ r1  16 LSL    r1  MOV  ( scale far left )
+ r2  16 LSL    r2  MOV
+ r3  16 LSL    r3  MOV
+
+ 'n T-LIST 02 +n dup  #FF und vert 256 /n
+ BASE-ADDRESS vert 24 R.IM r6 ADD
+ r6  vert IM   r6  ADD    ( r6 = absolute address of T-LIST )
+                          ( all registers loaded )
+
+ BEGIN                    (  trig_loop )
+   #0 IM         r5 ~EOR  ( check type flag )
+         NZ Y?            ( 0=goto A  rptest )
+   #0 IM         r3 ~EOR  ( test bit 31 of theta )
+   NEVER Y?               ( goto B  trig_core )
+       vert TH   ( A )
+   r1 #0 IM  r1  ~F  RSB  ( test bit 31 of -Y  in situ )
+   r1 #0 IM  r1      RSB
+        TH
+
+   ( B ) ( trig_core )
+   ( on entry the N flag will be set [tr] or clear [rp] )
+   ( r0 = loop counter j )
+   ( r1 = Y              )
+   ( r2 =              )
+   ( r3 = T              )
+   ( r4 = A[j]           )
+   ( r5 = tr/rp flag     )
+   ( r6 = t-list address )
+
+   r0 #2 LSL r6 [+R] r4 LDR  ( get d-theta from [ t_list+4*j ] )
+                             ( +ve rotation if N flag was clear)
+   NNEG Y?-> r3     r4 NS       r3 SUB  ( T  = T - A[j]        )
+   NNEG Y?-> r2  r1 r0 RSS ASR  r4 SUB  ( X` = X - Y/S   S=2^j )
+   NNEG Y?-> r1  r2 r0 RSS ASR  r1 ADD  ( Y  = Y + X/S         )
+                              ( -ve rotation if N flag was set )
+   NEG  Y?-> r3     r4 NS       r3 ADD  ( T  = T + A[j]        )
+   NEG  Y?-> r2  r1 r0 RSS ASR  r4 ADD  ( X` = X + Y/S         )
+   NEG  Y?-> r1  r2 r0 RSS ASR  r1 SUB  ( Y  = Y - X/S         )
+
+   r4 NS      r2  MOV  ( X=X` )
+   r0  #1 IM  r0  ADD  ( increment loop count )
+   16 IM      r0 ~SUB  ( r0=16? )
+ GE END
+
+  (  now save results on stack )
+ r1 #2 18 R.IM  r1  ADD  ( add #8000 to round Y,X,T )
+ r2 #2 18 R.IM  r2  ADD
+ r3 #2 18 R.IM  r3  ADD
+ r1    16 ASR   r1  MOV  ( re-scale right, 2 bytes )
+ r2    16 ASR   r2  MOV
+ r3    16 ASR   r3  MOV
+
+ PS #0 [+]      r1  STB ( write lsb  Y )
+ r1 #8 LSR      r0  MOV ( get msb      )
+ PS #1 [+]      r0  STB ( write msb    )
+
+ PS #2 [+]      r2  STB ( write lsb  X )
+ r2 #8 LSR      r0  MOV ( get msb      )
+ PS #3 [+]      r0  STB ( write msb    )
+
+ PS #4 [+]      r3  STB ( write lsb  X )
+ r3 #8 LSR      r0  MOV ( get msb      )
+ PS #5 [+]      r0  STB ( write msb    )
+NEXT
+
+
+hier $OC
+( Get 32 bit address off stack.  Subroutine for GETW etc )
+ PS  #0 [+]    r0  LDB  ( AHI lsb )
+ PS  #1 [+]    r1  LDB  ( AHI msb )
+ r0  r1 #8 LSL r2  ADD  ( AHI )
+
+ PS  #2 [+]    r0  LDB  ( ALO lsb )
+ PS  #3 [+]    r1  LDB  ( ALO msb )
+ r0  r1 #8 LSL r1  ADD  ( ALO )
+
+ r1  r2 #10 LSL r0 ADD ( 32 bit address )
+NEXT
+
+
+
+code GETW ( Get 32 bit word from 32 bit address )
+(   <ALO> <AHI>  GETW    ->    <wordLO> <wordHI>  )
+
+ r13 #4000 DEC/B! STM       (    STMFD r13!,{r14} )
+ dup ALWAYS JMP/L           ( get 32 bit address )
+
+ r0  BASE-ADDRESS NS [+R] r0 LDR ( Get word )
+
+ PS  #2 [+]    r0 STB        ( DLO lsb )
+
+ r0  8 LSR     r0 MOV
+ PS  #3 [+]    r0 STB        ( DLO msb )
+
+ r0  8 LSR     r0 MOV
+ PS  #0 [+]    r0 STB        ( DHI lsb )
+
+ r0  8 LSR     r0 MOV
+ PS  #1 [+]    r0 STB        ( DHI msb )
+ r13 #8000 INC/A! LDM         (     LDMFD r13!,{PC} )
+
+
+code PUTW  ( Put 32 bit word at 32 bit address )
+( <wordLO> <wordHI>  <ALO> <AHI>  PUTW  )
+
+ r13 #4000 DEC/B! STM       (    STMFD r13!,{r14} )
+ dup ALWAYS JMP/L           ( get 32 bit address )
+
+ PS  #8 IM    PS   ADD  ( 4 words off stack )
+
+ PS  #3 [-]    r1  LDB   ( DHI msb )
+
+ PS  #4 [-]    r2  LDB   ( DHI lsb )
+ r2  r1 8 LSL  r1  ORR
+
+ PS  #1 [-]    r2  LDB   ( DLO msb )
+ r2  r1 8 LSL  r1  ORR
+
+ PS  #2 [-]    r2  LDB   ( DLO lsb )
+ r2  r1 8 LSL  r1  ORR
+
+ r0  BASE-ADDRESS NS [+R]! r1 STR
+ r13 #8000 INC/A! LDM         (     LDMFD r13!,{PC} )
+
+
+code GETB  ( Read 8 bit byte at 32 bit address )
+(   <ALO> <AHI>  GETB    ->    <byte>  )
+
+ r13 #4000 DEC/B! STM       (    STMFD r13!,{r14} )
+ dup ALWAYS JMP/L           ( get 32 bit address )
+
+ PS  #2 IM    PS   ADD  ( 1 words off stack )
+
+ r0  BASE-ADDRESS NS [+R] r0 LDB ( Get byte )
+
+ PS  #0 [+]    r0 STB        ( DLO lsb )
+ #0 IM         r0 MOV        ( msb = 0 )
+ PS  #1 [+]    r0 STB        ( DLO msb )
+ r13 #8000 INC/A! LDM         (     LDMFD r13!,{PC} )
+
+
+code PUTB  ( Put 8 bit byte at 32 bit address )
+( <byte> <ALO> <AHI>  PUTB  )
+
+ r13 #4000 DEC/B! STM       (    STMFD r13!,{r14} )
+ ( dup ) ALWAYS JMP/L       ( get 32 bit address )
+
+ PS  #6 IM    PS   ADD  ( 3 words off stack )
+
+ PS  #2 [-]    r1  LDB   ( DLO lsb )
+ r0  BASE-ADDRESS NS [+R]  r1 STB
+ r13 #8000 INC/A! LDM         (     LDMFD r13!,{PC} )
+
+ 
+code $FLUSH
+  #0 #0 SWI                   ( flush D and I caches )
+NEXT
+
+             ( End code routines for IPS-EM )
+
+( IPS-EM       AMSAT IHU-2 Computer 1999 Mar 13        by JRM )
+#045E  kon  UHR
+#0464  kon  SU0
+#0468  kon  SU1
+#046C  kon  SU2
+#0470  kon  SU3
+#040E  kon  T/Z
+#0444  kon  KETTE
+0 kon 0   1 kon 1   2 kon 2   4 kon 4
+'n 2BLITERAL 'n 1BLITERAL 'n BRONZ 'n JUMP 'n $JEEX  'n LOOPEX
+'n +LOOPEX   'n RETEX  $ccodes 6 +n 8 !fk
+
+( IPS general definitions )
+:n >    - >0   ;n                :n <>    - =0 NICHT      ;n
+:n =    - =0   ;n                :n >=    - <0 NICHT      ;n
+:n <    - <0   ;n                :n <=    - >0 NICHT      ;n
+                                 :n <>0     =0 NICHT      ;n
+:n *       P* WEG ;n             :n P/     P/MOD WEG      ;n
+:n /MOD  #0 VERT P/MOD ;n        :n /       /MOD WEG      ;n
+:n MOD  /MOD VERT WEG ;n         :n +! DUP @ RDO + VERT ! ;n
+
+( Compiler constants )
+#03C0  kon  SYSLINE        ( Posn.  buffer for messages )
+#040F  kon  INFLAG         ( Input on/off )
+#0401  kon  DATA-IN        ( New input block arrived )
+#0400  kon  READYFLAG      ( Input being processed )
+#0404  kon  $PI            ( Compiler index pointer     )
+#0406  kon  $P1            ( Compiler parsing position )
+#0408  kon  $P2            ( End of block reached flag )
+#040A  kon  $P3            ( Link pointer for $SUCH  )
+#040C  kon  $H             ( Pointer to memory position )
+#FFF8  kon  $SL            ( Stack limit )
+#FF00  kon  $ML            ( Memory limit 64K )
+#0000  kon  $LL            ( End of IPS )
+
+$ccodes       @n kon DEFEX
+$ccodes 02 +n @n kon VAREX
+$ccodes 04 +n @n kon CONSEX
+
+#0200 kon $RBU   #03FE kon $RBE  #500 kon $EBU
+#74C3 kon SCHLUESSEL
+
+                    ( The Compiler )
+                    ( ------------ )
+
+#0004 feld $ND
+#0001 var $RS
+#0000 var ECHO
+#0000 var $F1
+#0000 var $F2
+#0000 var $KK
+#0000 var BASIS
+#0000 var BEM
+#0001 var BEA
+#0000 var EINGABEZAHL
+#0000 var Z-LESEN
+#0000 var COMPILEFLAG
+#0000 var $V1
+#0000 var LINK
+#0402 kon CMD#
+(  Error messages )
+(  Default language        Alternative language )
+16 feld STACKMESSAGE    16 feld L-STACKMESSAGE
+16 feld MEMMESSAGE      16 feld L-MEMMESSAGE
+16 feld NAMEMESSAGE     16 feld L-NAMEMESSAGE
+16 feld STRUCMESSAGE    16 feld L-STRUCMESSAGE
+16 feld TEXTMESSAGE     16 feld L-TEXTMESSAGE
+16 feld RSMESSAGE       16 feld L-RSMESSAGE
+16 feld ACKNMESSAGE
+
+~ SPEICHER VOLL !  ~   'n MEMMESSAGE       02 +n $OC !t
+~ MEMORY FULL !    ~   'n L-MEMMESSAGE     02 +n $OC !t
+~ NAME FEHLT !     ~   'n NAMEMESSAGE      02 +n $OC !t
+~ NAME MISSING !   ~   'n L-NAMEMESSAGE    02 +n $OC !t
+~ STAPEL LEER !    ~   'n STACKMESSAGE     02 +n $OC !t
+~ STACK EMPTY !    ~   'n L-STACKMESSAGE   02 +n $OC !t
+~ STRUKTURFEHLER ! ~   'n STRUCMESSAGE     02 +n $OC !t
+~ STRUCTURE ERROR! ~   'n L-STRUCMESSAGE   02 +n $OC !t
+~ TEXTFEHLER !     ~   'n TEXTMESSAGE      02 +n $OC !t
+~ TEXT-ERROR !     ~   'n L-TEXTMESSAGE    02 +n $OC !t
+~ UNZUL. NAME !    ~   'n RSMESSAGE        02 +n $OC !t
+~ DUPLICATE NAME ! ~   'n L-RSMESSAGE      02 +n $OC !t
+~ ( IPS-EM v0.12 ) ~   'n ACKNMESSAGE      02 +n $OC !t
+
+( Compiler definitions )
+:n INCR   DUP  @  1  +  VERT  !  ;n
+:n HIER   $H  @  ;n
+:n H2INC  HIER  2  +  $H  !  ;n
+:n $DEP   HIER  !  H2INC  ;n
+:n $CEN   $RBU $PI !  1 ECHO !  0 READYFLAG !B ;n
+:n IE   $P1 @ $PI @ 1 - je I @B #80 ODER I !B
+                        nun  (0 $P2 !) $CEN WEG ;n
+#18  kon  $LANG                    ( Messages language switch )
+:n SYSWRITE $LANG +  SYSLINE 16 >>> 0 IE  ;n
+:n L>>> anfang DUP 256 > ja? 256 - S>R PDUP 256 >>>
+                            256 + VERT 256 + VERT R>S
+       dann/nochmal DUP >0 ja?  >>>
+                           nein: PWEG WEG
+                           dann ;n
+
+:n TRANSPORT   $EBU #200 L>>> ;n
+
+:n ETRANSMIT   #70 T/Z !B  #FFFF $EBU DUP #1FF +
+               je I @B CYC2 nun #700 !  ;n
+
+:n DIN-ENABLE  1 INFLAG !B ;n
+
+code $SCODE
+  (        Looks through linked list until name found        )
+  (        ------------------------------------------        )
+  ( Return address of a word. 0 if not found                 )
+  ( $P3 points to SYS PAGE loc. holding initial link pointer )
+  ( $ND contains the 4-byte hashed name                      )
+    #4  24 R.IM  r0 MOV             ( r0 = #400 = syspage )
+    r0 #0A IM    r0 ADD             ( r0 = #40A $P3 )
+  r0 BASE-ADDRESS NS [+R]!  r6 LDB  ( lsb r0=MEM+r0 peek $P3 )
+  r0 #1 [+]     r0  LDB             ( msb )
+  r6 r0 #8 LSL  r1  ADD ( p = r1 = IPS addr of initial link )
+
+  'n $ND 02 +n dup #FF und vert 256 /n
+      24 R.IM r2 MOV
+  r2  vert IM r2 ADD
+  r2 BASE-ADDRESS NS [+R]! r0  LDB  (byte 0 of hashed name )
+  r2 #1              [+]   r3  LDB ( byte 1 )
+  r2 #2              [+]   r5  LDB ( byte 2 )
+  r2 #3              [+]   r4  LDB ( byte 3 )
+
+( now compare four bytes at p with hashed name at $ND
+(
+( r0,r3,r5,r4 contain bytes of name to search for [preserved] )
+( r1 = p   MEM addr of place to check                         )
+( r2 and r6 are free for search code                          )
+( bytes checked in descending order of entropy )
+
+  BEGIN ( search loop )
+    r1 BASE-ADDRESS NS r2 ADD
+    r2 #1 [+] r6 LDB                   ( byte 1   H ~ 7.5 )
+    r6 r3 NS ~EOR
+    Z Y?  r2 #2 [+] r6 LDB             ( byte 2   H ~ 7.1 )
+          r6  r5 NS   ~EOR
+          Z Y? r2 #3 [+] r6 LDB        ( byte 3   H ~ 6.4 )
+               r6  r4 NS   ~EOR
+               Z Y?  r2 #0 [+] r6 LDB  ( byte 0   H ~ 3.3 )
+                     r6 #3F IM r6 AND
+                     r6  r0 NS   ~EOR
+                     NZ Y? ( skip to found )
+                   vert TH
+            vert TH
+       vert TH
+    vert
+    ( get here if not matched )
+    r1  #4 IM       r1 ADD           ( get next link )
+    r1 BASE-ADDRESS NS [+R]! r2 LDB  ( lsb; r1=MEM+r1 )
+    r1 #1              [+]   r1 LDB  ( msb )
+    r2 r1 #8 LSL ~F r1 ADD           ( combine and plant in p )
+    Z                        ( Z  = end of linked list reached )
+  END                        ( NZ = jump back to search )
+  ( not found )
+  #5 IM r1 MVN       ( r1 = -6 ; force a return 0 on not found )
+      TH
+  ( found )
+  r1 #6 IM   r0 ADD ( name found/notfound; return p+6 [TCF] )
+  r0 #8 LSR  r6 MOV
+  PS #1 [-]! r6 STB ( push msb, decr PS )
+  PS #1 [-]! r0 STB ( push lsb  decr PS )
+NEXT
+
+code $CSCAN
+
+ ( $CSCAN  Scan input buffer for separators/non-separators     )
+ ( -------------------------------------------------------     )
+ ( There are only two calls to this, both from $NAME           )
+ ( The first has entry flag =1, and causes scan to first       )
+ ( non-separator                                               )
+ (                                                             )
+ ( The 2nd has entry flag =2 which scans to next separator.    )
+ ( Thus a found word is bracketed by $P1 Start byte and $PI    )
+ ( where $PI is the Index pointer.                             )
+ (                                                             )
+ ( Entry = 1                                                   )
+ ( ---------                                                   )
+ ( Scan until valid character found                            )
+ ( Returns >0 if valid character found                         )
+ (          0 if invalid character                             )
+ (         $P1 = $PI  init by $NAME when valid char found      )
+ (         $P2 = 1 if if end of buffer found  i.e.  $PI=$PE    )
+ (                                                             )
+ ( Entry = 2                                                   )
+ ( ---------                                                   )
+ ( Scan until separator found                                  )
+ ( Returns n1 which can be discarded ???                       )
+ (         n2 which can be discarded ???                       )
+ (         $P1 and $PI-1 identifies word string                )
+ (                                                             )
+ ( Separator       =  space   {   }  <eob>                     )
+ ( Valid character =  NOT [ the above or anything inside { } ] )
+
+ PS #2 []+  r0 LDB ( pull lsb; PS+=2 )
+ r0 #1 IM   r3 RSB ( r3 = flag )
+                   ( 1,2 -> 0,          ;  -1 )
+                   (        scan for ch ;  scan for sep )
+
+    #4  24 R.IM  r5 MOV             ( r5 = #400 = syspage)
+    r5 #04 IM    r0 ADD             ( r0 = #404 $PI )
+  r0 BASE-ADDRESS NS [+R]!  r6 LDB  ( lsb r0=MEM+r0 peek $PI )
+  r0 #1 [+]     r0  LDB             ( msb )
+  r6 r0 #8 LSL  r1  ADD             ( r1 = pi  value of $PI )
+
+  'n $RBU #2 +n $OC @n #200 +n 256 /n ( end ip buffer+1 )
+       24 R.IM   r2 MOV  ( r2 = #200 = end of input buffer +1 )
+         #0 IM  r4  MOV               ( clear comment flag r4 )
+
+ BEGIN  ( A )         ( scanwhile )
+   BASE-ADDRESS r1 NS [+R]  r0  LDB ( get char @pi )
+   r0  #7F IM  r0  AND              ( strip off MSBit  why??? )
+       #20 IM  r0 ~EOR              ( space? )
+   NZ Y?
+          #28 IM  r0  ~EOR          ( [ ? )
+          Z Y?-> #1 IM r4 MOV ( c-flag=1 )
+          NZ Y?
+                #29 IM  r0  ~EOR    ( ] ? )
+                Z  Y?-> #0 IM r4  MOV ( c-flag=0 )
+                NZ Y?-> #1 IM r4 ~EOR
+             TH
+      TH
+   Z  Y?->  #0 IM  r0  MVN ( set r0= -1  a separator found )
+   NZ Y?->  #0 IM  r0  MOV ( set r0=  0  no tests equalled )
+   r0  r3 NS     r0 ~F EOR ( flag% EOR sep_result )
+   NZ Y?  vert  ( Z  jump B )
+         r2 NS r1 ~SUB                ( cmp pi,pe )
+         LT Y?  vert  ( GE jump B )   ( pi < pe End of block )
+               r1  #1 IM  r1  ADD     ( pi += 1 )
+
+ NEVER END ( jump A ) ( endwhile )
+           TH
+      TH
+
+ ( B )        ( r3,r4 now freed )
+ #1 IM r0  MOV                       (  ret = 1 )
+ r2 NS r1 ~SUB                       ( IF pi%=pe%  set $P2 = 1 )
+ Z Y?  (  NE jump C )
+            #1 IM  r0 MOV             ( eob found )
+      r5 #08   IM  r2 ADD             ( r2 = #408 $P2 )
+      r2 BASE-ADDRESS NS [+R]! r0 STB ( put 1 to $P2 )
+      #0       IM  r0 MOV             ( ret = 0 )
+      r2 #1 [+]    r0 STB             ( msb=0 )
+    TH
+
+ ( C ) ( not eob )
+ #0  IM  r2  MOV
+ PS #1 [-]! r2 STB ( push msb=0, decr PS )
+ PS #1 [-]! r0 STB ( push ret    decr PS )
+
+ r5 #04   IM  r0 ADD             ( r0 = #404 $PI )
+ r0 BASE-ADDRESS NS [+R]! r1 STB ( lsb  put  pi to [r0] )
+ r1 #8 LSR r1 MOV
+ r0 #1 [+] r1 STB                ( msb )
+NEXT
+
+:n $SUCH  LINK @ $P3 ! $SCODE ;n
+
+:n $NAME   0   READYFLAG @B
+       ja? 1 $CSCAN >0
+          ja? $PI @ $P1 !
+              2 $CSCAN PWEG #CE57 #8D
+              $P1 @ $PI @ ZWO - DUP 63 > ja? WEG 63
+                                         dann
+              DUP $ND !B 1 - ZWO +
+              je I @B $POLYNAME
+              nun $ND 3 + !B $ND 1 + ! 1
+          dann
+       dann ;n
+
+:n $ZAHL 1 ( OK ) 0 ( ANF. ) $PI @ 1 - $P1 @
+  #2D ZWO @B = ja?    1 +  -1 S>R ( NEG ) 10 ( BASIS )
+               nein:        1 S>R ( POS )
+                    #23 ZWO @B =
+                    ja?   1 +             16
+                    nein: #42 ZWO @B =
+                          ja?    1 +       2
+                          nein:           10
+               dann dann  dann   BASIS !
+ VERT je BASIS @ * I @B DUP #3A < ja? #30 -
+                                  dann
+                        DUP #40 > ja? #37 -
+                                  dann
+         DUP BASIS @ >= ZWO <0 ODER ja? ( FEHLER ) WEG 0 RDU
+                                    dann +
+      nun R>S * VERT ;n
+
+69 feld $CBU  ( Convolutional decoder output )
+
+:n TH/DECODE  0 0 0  0 68 je $RBU I + I + @ W/DECODE $CBU I + !B
+                         nun PWEG WEG
+             $CBU 3 + $CBU 66 >>> ;n
+
+:n CLEAR$RBU #20 $RBU !B  $RBU DUP 1 + 511 L>>> ;n
+
+:n COMPILER  $NAME
+ja? $SUCH
+    1   ( FUER WEITER ) BEM @B
+        ja? ZWO 'n RUMPELSTILZCHEN
+                = ja?   ( RUMP. ) 0 BEM !
+                  nein: ( NICHT RUMP. ) Z-LESEN @
+                       ja?   PWEG 0 1
+                       nein: ZWO BEA @ <
+                             ja? IE WEG 0
+                             dann
+                       dann
+                  dann
+        dann
+   ja?  ( WEITERFLAG ? )  DUP =0
+        ja? ( NUMBERPROCESSOR )
+         WEG $ZAHL
+          ja?  COMPILEFLAG @B
+            ja? DUP #FF00 UND
+             =0 ja? 'n 1BLITERAL $DEP
+                      HIER !B $H INCR
+                nein: 'n 2BLITERAL $DEP $DEP
+                dann
+            nein: BEM @B ja? EINGABEZAHL ! 0 Z-LESEN !
+                         dann
+            dann
+          nein: IE
+          dann
+      nein: ( FOUNDPROCESSOR ) DUP 6 - @B #C0 UND
+            COMPILEFLAG @B ODER
+            DUP 1 =
+            ja?   WEG HIER $ML >=U ja?  WEG MEMMESSAGE SYSWRITE
+                                  nein: $DEP
+                                  dann
+            nein: DUP #80 = VERT #C1 = ODER
+                  ja?    IE
+                  nein: R>S $V1 ! $TUE $V1 @ S>R
+                  dann
+            dann
+      dann
+      $PSHOLEN $SL > ja? $SL $PSSETZEN STACKMESSAGE SYSWRITE
+                       WEG $F1
+                   dann
+   dann
+dann READYFLAG @B $P2 @B UND
+     ja?  CLEAR$RBU
+          ACKNMESSAGE SYSLINE 16 >>> ( IPS-EM ) $CEN
+     dann
+(SCHLUESSEL- UND CODE-PRUEFUNG ) DATA-IN @B
+ja? 0 DATA-IN !B SCHLUESSEL
+    $RBU $RBE 1 + je I @B CYC2
+                  nun
+    =0 DUP NICHT
+       ja? WEG TH/DECODE SCHLUESSEL
+           $CBU DUP 65 + je I @B CYC2
+                         nun =0 DUP
+           ja? CLEAR$RBU $CBU $RBU 64 >>>
+           dann
+       dann ja? ( OK ) 1 READYFLAG !B
+                0 $P2 !  CMD# INCR      #2020 (    )
+            nein: ( FEHLER ) 1 ECHO !   #454B ( KE )
+            dann $RBE !
+dann ;n
+
+             ( Compiler Auxiliary routines )
+             ( --------------------------- )
+
+:n ENTRYSETUP $F1 $KK ! $NAME DUP
+       ja?   $SUCH =0 NICHT $RS @ UND
+             ja?   RSMESSAGE SYSWRITE WEG  0
+             nein: HIER DUP $KK ! LINK @ H2INC H2INC
+                   $DEP $ND ZWO 4 >>> LINK ! HIER VERT H2INC
+             dann
+       nein: NAMEMESSAGE SYSWRITE
+       dann ;n
+
+:n $GETADR $NAME ja?   $SUCH DUP =0
+                             ja?   IE      0
+                             nein:         1
+                             dann
+                nein: NAMEMESSAGE SYSWRITE 0
+                dann ;n
+:hpri  '     $GETADR ja? COMPILEFLAG @
+                        ja? 'n 2BLITERAL $DEP $DEP
+                        dann
+                    dann ;n
+
+:prior  ;     'n RETEX $DEP  0 COMPILEFLAG !B
+         $F2 <>
+         ja? STRUCMESSAGE $LANG  + SYSLINE #20 + 16 >>>
+             LINK @ DUP $H ! 4 + @ LINK !      0 IE
+         dann ;n
+
+:int  :   ENTRYSETUP ja? DEFEX VERT ! 1 COMPILEFLAG !B $F2
+                    dann ;n
+:n PRIMODIFY   $KK @ @B ODER $KK @ !B ;n
+
+:int :PRIOR  i> 'n  : $dep <i      #80 PRIMODIFY ;n
+:int :HPRI   i> 'n  : $dep <i      #40 PRIMODIFY ;n
+:int :INT    i> 'n  : $dep <i      #C0 PRIMODIFY ;n
+
+:prior JA? 'n BRONZ $DEP HIER H2INC ;n
+:prior DANN  HIER VERT ! ;n
+:prior NEIN: 'n JUMP $DEP HIER H2INC VERT i> 'n DANN $dep <i ;n
+:prior JE    'n $JEEX $DEP HIER H2INC ;n
+:prior NUN   'n LOOPEX  $DEP DUP i> 'n DANN $dep <i 2 + $DEP ;n
+:prior +NUN  'n +LOOPEX $DEP DUP i> 'n DANN $dep <i 2 + $DEP ;n
+:prior ANFANG HIER ;n
+:prior ENDE? 'n BRONZ $DEP $DEP ;n
+:prior DANN/NOCHMAL VERT 'n JUMP $DEP $DEP i> 'n DANN $dep <i ;n
+
+:int KON        ENTRYSETUP ja? CONSEX VERT ! $DEP
+                           dann ;n
+:int VAR        ENTRYSETUP ja? VAREX  VERT ! $DEP
+                           dann ;n
+:int FELD       ENTRYSETUP ja? VAREX  VERT ! HIER + $H !
+                           dann ;n
+   'n $EBU 02 +n $OC @n var SP               (  Screen Pointer )
+:n !CHAR  SP @ !B SP INCR ;n
+:n TLITERAL  I 1 + R>S @B PDUP + S>R SP @ PDUP + SP !
+            VERT >>> ;n
+
+:hpri " $PI INCR $PI @
+        anfang $PI @ DUP @B #22 = VERT $RBE > ODER $PI INCR
+        ende?
+        $PI @ 2 - ZWO - DUP 1 < ZWO 256 > ODER
+        ja?   TEXTMESSAGE  SYSWRITE VERT WEG
+        nein: COMPILEFLAG @ ja? S>R I 'n TLITERAL $DEP HIER !B
+                                $H INCR HIER I >>>
+                                HIER R>S + $H !
+                            dann
+        dann ;n
+
+:int !T  VERT  >>>  ;n
+
+:n LEERZ  S>R SP @ #20 ZWO !B DUP 1 + R>S 1 - L>>> ;n
+
+:n !FK    S>R I 2 * + 1 R>S je 2 - DUP S>R ! R>S
+                           nun WEG ;n
+
+:n WAND BASIS @ 10 = ja?   DUP ( ZAHL ) <0
+                          ja? CHS #2D ( - ) !CHAR
+                          dann 10000 0 ( W.-ANFANG )
+                    nein: 16 BASIS ! #23 ( # ) !CHAR
+                          #1000 1 ( W.-ANFANG )
+                    dann  S>R
+   anfang VERT ZWO /MOD VERT
+            I NICHT ja?  DUP >0 ja? R>S WEG 1 S>R
+                    dann        dann
+                  I ja?  DUP  #30 + DUP #39 >
+                                    ja? 7 +
+                                    dann !CHAR
+                    dann
+                    WEG VERT BASIS @ / DUP =0
+   ende? PWEG R>S NICHT ja? #30 !CHAR
+                        dann ;n
+
+:n ZEIG-STAPEL
+         SP @ S>R  $RBU SP ! #80 LEERZ
+    $PSHOLEN $SL ZWO - DUP 32 > ja? WEG 32
+                                dann  S>R I +
+    anfang I >0
+      ja? DUP I - DUP 1 + @B 256 * VERT @B + R>S 2 - S>R
+        $RBU I 4 * + SP !  WAND
+      dann/nochmal
+    R>S  PWEG R>S SP !  ;n
+
+:n $INSERT  VERT  #7  UND    2  *  KETTE  +  !  ;n
+
+:n $CHAINACT  COMPILEFLAG  @
+             ja?    'n  2BLITERAL  $DEP  $DEP
+                    'n  $INSERT    $DEP
+             nein:  ZWO  #FFF8  UND  ( mask for 0-7 )
+                    =0  ja?    $INSERT
+                        nein:  IE
+                        dann
+             dann  ;n
+
+:hpri AUSH   'n  RUMPELSTILZCHEN  $CHAINACT  ;n
+:hpri EINH   $GETADR  ja?  $CHAINACT
+                      dann ;n
+
+:int ?  $GETADR  ja? 2 +
+                 dann  ;n
+
+:n SCHREIB    S>R SP @ I >>> SP @ R>S + SP ! ;n
+
+:int WEG/AB
+   $GETADR  ja?  DUP  $LL  VERT  >=U
+                 ja?    IE
+                 nein:  2  -  DUP  @  LINK  !  4  -  $H  !
+                 dann
+           dann  ;n
+
+
+'n RUMPELSTILZCHEN kon A-COMPOSER
+
+:n EB-HANDLER  T/Z @B =0
+      ja? ECHO @B
+          ja?   $P2 @ ja? ZEIG-STAPEL 0 $P2 !
+                      dann
+                $RBU TRANSPORT ETRANSMIT DIN-ENABLE 0 ECHO !
+          nein: READYFLAG @ =0 ( WEDER DATA-IN NOCH READYFLAG )
+                ja? A-COMPOSER $TUE
+                dann
+          dann
+      dann ;n
+                    ( End IPS-EM )
+
+             ( Utilities and extensions )
+             ( ------------------------ )
+
+:int AWEG  $SL  $PSSETZEN  ;n                  (  Clear Stack )
+
+:n LANG <>0  ja?    L-STACKMESSAGE  STACKMESSAGE  -
+             nein:  0
+             dann  'n $LANG 2 + !  ;n
+             
+:int USERCODE HIER 3 + #FFFC UND $H !  ( word align $H )
+              ENTRYSETUP ja? HIER VERT ! dann HIER + $H ! ;n
+
+
+             ( Build the rest of SYSPAGE etc )
+             ( ----------------------------- )
+
+<X  ( off )   ( Useful macros )
+:n getprf 'n 'n $tue #2 +n ;n
+              ( Get address of parameter field of target word )
+
+:n getval getprf $OC @n ;n   ( Get value of target KON or VAR )
+X>  ( on again )
+
+'n COMPILER                                (  Construct chain )
+'n EB-HANDLER 'n RUMPELSTILZCHEN dup dup dup dup dup dup dup
+'n JUMP          getval KETTE  #4 -n  dup     $OC 12 !fk
+
+               hier getprf $LL   !O                ( Set $LL )
+               hier getval $H    !O                ( Set $H )
+       getval $RBU  getval $PI   !O                ( Init $PI )
+  $ccodes 22 +n @n  getprf LINK  !O                ( Set LINK )
+               ( END OF METACOMPILATION )
+               
+( ----------------------------------------------------------- )
+
+( Plant IPS-EM page zero inside $EBU space )
+getval $EBU $OC  ~ RAM:$.EMpage0  ~ $load
+
+( Round hier upwards, and put it on stack )
+hier #1 -n #200 /n #1 +n #200 *n  (hier^) 
+
+( Plant B EMinit at #400 )
+#400 $h !n   dup (hier^) $OC  NEVER END
+
+( Append the IPS-EM Application launcher, assumed #200 bytes )
+dup (hier^) $OC ~ RAM:$.EMinit ~  $load  (hier^) #200 +n $h !n
+
+<X  ( off )          ( CRCC UTILITIES )
+:n crcc  #FFFF  rdu je i @b cyc2 nun ;n             (block crcc)
+:n crccp je i i i #1FF +n crcc vert          (crcc',addr on stk)
+     #4200 -n  #100 /n #4170 +n !n      (poke crcc' into loader)
+    #200 +nun ;n
+
+     ( NOW COMPUTE CRCCs AND PLANT THEM INTO THE LOADER )
+
+#4000   ~ RAM:$.IHU2Loader   ~ $load            ( Import loader)
+
+X> hier <X  #1 -n   dup  (last loc)       ( Get the end of PROG)
+#200 /n #1 +n #2 *n #4164 !b                   ( Plant end addr)
+#3E00 +n dup dup                        ( End of PROG, physical)
+dup #1 -n (last-1) dup #1 -n (last-2) #4200 vert
+  crcc vert !n                          ( crcc over whole PROG )
+#4200 vert crccp                        ( Do CRCCs on PROG part)
+#4000 #41FD  crcc #41FE !n                ( CRCC on loader part)
+#4000 vert  ~  RAM:$.IPS-EM  ~ $save
+                              ( Save IHU-2 IPS-EM Upload image )
+~ SetType RAM:$.IPS-EM IPSBin2 ~ oscli       ( Change filetype )
+
+( Save main IPS-EM binary image  - 0x400 onwards - into RAM )
+#4200 vert  ~ RAM:$.EMcore ~ $save
+
+~ IHU-2  IPS-EM built OK  ~ #01D5 !t      ( Information splash )

@@ -1,0 +1,289 @@
+
+(       IPSY32-M For the M3205 Meinzer IPS32 Computer         )
+(                  Version 1.3 2005-03-23                     )
+(                    {c} Karl Meinzer                         )
+( ----------------------------------------------------------- )
+( Version 1.2 by Karl Meinzer 2005-03-06                      )
+( Version 1.3 2005-03-23 - Updates by Paul Willmott           )                                     )
+(     - @ and ! replace @B and !B for flags                   )
+(     - " AASM/Y " read removed from the end of the source    )
+(     - Splash changed to IPS-M format                        )
+(     - Save of binary, and splash moved from end of ARM      )
+(     - assembler to this file                                )
+(     - Binary save filename, indeed all filenames changed    )
+(     - to standard format                                    )
+(     - cls renamed aweg                                      )
+(     - oscli made optional                                   )
+( ----------------------------------------------------------- )
+
+( IPS-Y is similar to IPS-X, but creates 32-bit targets        )
+( IPS-Y is an add-on module to be read by any 32-bit IPS, e.g. )
+( IPS-A of km or IPS32-M by pw.                                )
+  
+( $TH contains a separate pointer to the target object, it's   )
+( value is the value of the destination object's $H.           )
+
+( $TH is distinct from $H of the YCOMPILER itself             )
+( The X-compilation is put with offset into IPS-Y workspace,  )
+( the target presumed to start at #6000. The depostion uses   )
+( variable $OFS which is preset with value #6000              )
+
+#0000 VAR $XC      ( X-compile off, set to 1 for on  ) 
+#0010 VAR $TH      ( $H for the targetobject         ) 
+#6000 VAR $OFS     ( Offset to deposit area          ) 
+#6000 VAR $XA      ( Beginning of deposit area       ) 
+#0000 VAR TLINK    ( LINK of the target linked list  ) 
+
+16 FELD REMESSAGE   " REDEFINITION!    "  REMESSAGE !T
+
+40 FELD $CCODES 
+
+(  $CCODES used as follows for the target object:  )
+( +00 ' DEFEX      +04 ' VAREX      +08 ' CONSEX   )  
+( +12 ' RETEX      +16 ' 4BLITERAL  +20 ' BRONZ    )
+( +24 ' JUMP       +28 ' JEEX       +32 ' LOOPEX   )
+( +36 ' +LOOPEX     )   
+
+
+: THIER   $TH  @    ;
+: TH4INC  4 $TH +!  ;
+
+: $AOF       $OFS @ + ;     ( Apply offset  ) 
+: $ROF       $OFS @ - ;     ( Remove offset ) 
+
+: $DEPT   THIER $AOF ! TH4INC ;
+           (deposits a 32-bit word in X-target  )
+          
+: #SUCH TLINK @ DUP <>0  
+        JA? $AOF S>R 
+            ANFANG $ND @ I @ EXO #FFFFFF3F UND =0
+                   JA?   R>S 8 + $ROF S>R     1    ( gef. )
+                   NEIN: R>S 4 + @ DUP S>R =0  
+                         JA?                  1    ( L.-ende? ) 
+                         NEIN: R>S $AOF S>R   0    ( weiter s.) 
+                         DANN 
+                   DANN
+            ENDE? R>S 
+        DANN ;
+                           
+: YCOMPILER  $NAME
+JA? #SUCH DUP =0 NICHT
+    JA? COMPILEFLAG @ $XC @ UND JA?   $DEPT
+                                NEIN: IE
+                                DANN
+    NEIN: WEG $SUCH DUP =0
+          JA? ( NUMBERPROCESSOR ) WEG $ZAHL
+             JA?  COMPILEFLAG @                   
+               JA?  $XC @ JA?   $CCODES  16 + @ $DEPT $DEPT
+                                ( 4BLITERAL in X-TARGET )
+                          NEIN: ' 4BLITERAL $DEPW $DEPW
+                                ( 4BLITERAL for IPS-Y ) 
+                          DANN
+               DANN
+             NEIN: IE
+             DANN
+          NEIN: ( FOUNDPROCESSOR ) DUP 8 - @B #C0 UND
+            COMPILEFLAG @ ODER  DUP 1 =
+            JA? WEG $XC @ NICHT JA? $DEPW HIER  $XA @ #100 - >
+                                       JA? MEMMESSAGE SYSWRITE
+                                       DANN
+                                NEIN: IE
+                                DANN
+            NEIN: DUP #80 = VERT #C1 = ODER
+                  JA?    IE
+                  NEIN:  R>S $V1 ! $!>> RUMPELSTILZCHEN
+                         $V1 @ S>R
+                  DANN
+            DANN
+          DANN
+     DANN
+  $PSHOLEN $SL > JA? $SL $PSSETZEN STACKMESSAGE SYSWRITE
+                     WEG $F1
+                 DANN
+DANN  READYFLAG @ $P2 @ UND
+      JA? #20 TV8 !B TV8 DUP 1 + $PI @ TV8 - 1 - >>>
+          TV8 $CEN
+      DANN ;
+      
+
+( replace COMPILER by YCOMPILER in KETTE-4 ) 
+
+' YCOMPILER KETTE 4 - !
+
+( YCOMPILER running, now compile the Y-executables )
+
+( The words starting from here are the only ones which are )
+( accessible during X-compilation mode of IPS-Y.           )
+
+: weg WEG ;         : @b   @B ;          : @n  @ ;  
+: -n    - ;         : +n    + ;          : !n  ! ; 
+: !b   !B ;         : rdu RDU ;          : vert VERT ;    
+: dup DUP ;         : zwo ZWO ;          : pdup PDUP ;
+
+
+: $aof       $OFS @ + ;     ( Apply offset  ) 
+
+
+' weg 4 - DUP @ KON Vorbezug
+                KON VorbezugAdr
+: >x-mode   1 $XC !        0 VorbezugAdr ! ;
+: >ips      0 $XC ! Vorbezug VorbezugAdr ! ;
+
+: $dept    $DEPT ;
+
+
+:INT aweg   $SL  $PSSETZEN  ;       (  Clear Stack )
+
+:INT $save  $SAVECODE      DUP  =0  JA?   IE
+                                    NEIN: WEG
+                                    DANN      ;
+
+:INT $load  $LOADCODE      DUP  =0  JA?   IE
+                                    NEIN: WEG
+                                    DANN      ;
+
+:INT read  $OPENFILE       DUP  =0  JA?   IE  0
+                                    DANN  LOADFLAG  !  ;
+
+( To implement the optional definition oscli -     )
+( Uncomment the following IPS definition           )
+( Note: also make the necessary changes in the     )
+( source of IPS32-M                                )
+
+( :INT oscli $OSCLICODE      DUP  =0  JA?   IE   )
+(                                     NEIN: WEG  )
+(                                     DANN     ; )
+
+
+: $th $TH ;   : thier THIER ;   : tlink TLINK ;
+
+:HPRI ok #20 SYSLINE !B SYSLINE DUP 1 + 63 >>> ;
+
+$CCODES KON $ccodes
+
+:INT !t VERT >>> ; 
+        
+: >>>n >>> ;
+
+: !fw  S>R I 4 * + 1 R>S JE 4 - DUP S>R ! R>S NUN WEG ;
+
+16 FELD TAMESSAGE  " NOT IN X-MODE!   "  TAMESSAGE !T
+
+: entrysetup  $XC @
+ JA?  $F1 $KK ! $NAME DUP 
+    JA?   #SUCH =0 NICHT JA?  REMESSAGE SYSLINE 16 >>>
+                        DANN
+          THIER DUP $KK ! TLINK @ TH4INC 
+                   $DEPT $ND ZWO $AOF 4 >>> TLINK ! 
+                   THIER VERT TH4INC 
+    NEIN: NAMEMESSAGE SYSWRITE
+    DANN  
+ NEIN: TAMESSAGE SYSWRITE 0
+ DANN ; 
+
+: $getadr $NAME JA?   #SUCH  DUP =0
+                             JA?   IE       0
+                             NEIN:          1
+                             DANN
+                NEIN: NAMEMESSAGE SYSWRITE  0
+                DANN ;
+
+:HPRI 'n   $getadr JA? COMPILEFLAG @ $XC @ UND
+                       JA? $CCODES 16 + @  $DEPT $DEPT 
+                           ( 4BLITERAL )
+                       DANN
+                   DANN ;
+
+:PRIOR ;n   $CCODES  12 + @ $DEPT ( RETEX ) 0 COMPILEFLAG !
+         $F2 <>
+             JA? STRUCMESSAGE SYSLINE #20 + 16 >>>
+                 TLINK @ DUP $TH ! 4 + $AOF @ TLINK ! 0 IE
+             DANN ;
+             
+:    :n  entrysetup JA? $CCODES @ ( DEFEX ) VERT $AOF !
+                        1 COMPILEFLAG ! $F2
+                    DANN ;
+                    
+: primodify   $KK @ $AOF @B ODER $KK @ $AOF !B ; 
+
+: :prior       :n     #80 primodify ;
+: :hpri        :n     #40 primodify ;
+: :int         :n     #C0 primodify ;
+
+' :n 8 - DUP @B #C0 ODER VERT !B (  :n typ INT ) 
+
+:PRIOR ja?  $CCODES 20 + @ ( BRONZ ) $DEPT THIER TH4INC ;
+           
+:PRIOR nein: THIER 8 + VERT $AOF ! $CCODES  24 + @ $DEPT
+             THIER TH4INC ;
+
+: dann  THIER VERT $AOF ! ;
+
+:PRIOR je    $CCODES 28 + @ ( $JEEX ) $DEPT THIER TH4INC ;
+
+:PRIOR nun   $CCODES 32 + @ ( LX ) $DEPT DUP dann
+             4 + $DEPT ;
+:PRIOR +nun  $CCODES 36 + @ ( +LX ) $DEPT DUP dann
+             4 + $DEPT ;
+             
+:PRIOR anfang THIER ;
+
+:PRIOR ende? $CCODES 20 + @ ( BRONZ ) $DEPT $DEPT ;
+
+:PRIOR dann/nochmal VERT $CCODES 24 + @ $DEPT $DEPT dann ;
+
+' dann 8 - DUP @B #80 ODER VERT !B (  'dann' into type PRIOR )
+
+:INT kon        entrysetup JA? $CCODES 8 + @ VERT $AOF ! $DEPT
+                            DANN ;
+:INT var        entrysetup JA? $CCODES 4 + @ VERT $AOF ! $DEPT
+                           DANN ;
+:INT feld       entrysetup JA? $CCODES 4 + @ VERT $AOF !
+                                THIER +   ( word-adjust: ) 
+                                3 + #FFFFFFFC UND $TH !
+                           DANN ;
+
+( rcode optionally supports the itable mechanism of H-3205 )
+                         
+0 VAR H-3205           ( Set to 1 for itable assembly )
+ 
+#0200 VAR ITAB-SIZE
+
+: For_H-3205 1 H-3205 ! ;
+
+: ITAB-CHECK H-3205 @
+       JA?  ITAB-SIZE @ 4 - ZWO >=U  
+            JA? 4 * ITAB-SIZE @ - 
+            DANN
+       DANN ;
+
+: rcode   ITAB-CHECK  THIER 3 + #FFFC UND $TH ! ( WORD-ALIGN )
+     entrysetup
+     JA? $AOF !               
+     DANN ;
+
+:INT  ~ $PI INCR $PI @
+        ANFANG $PI @ DUP @B #7E = VERT $TVE > ODER $PI INCR
+        ENDE?
+        $PI @ 2 - ZWO - ;
+        
+: tweg/ab $getadr JA? 4 - DUP $AOF @ TLINK ! 4 - $TH ! DANN ;
+
+( HEXDISPLAY FUER IPS )
+
+: ZEIG   VERT #30 + DUP #39 > JA? 7 + DANN ZWO !B 1 + ( POS ) ;
+
+: ZEIGI  ZEIG 1 - DUP @B #80 ODER VERT !B ;
+
+: POX    R>S I #40 * I #F0 UND 4 / + #3FF UND TV0 + VERT S>R ;
+
+: HX 0 255 JE DUP I + @B DUP #F UND VERT 16 / POX ZEIG ZEIG
+  #20 ZWO !B 1 + #20 VERT !B NUN WEG 0 15 JE I I 4 * 2 + TV0 +
+  ZEIGI I I 64 *
+  63 + TV0 + ZEIGI NUN TV8 2 + $CEN 0 $P2 ! ;
+  
+: CLTV #20 TV0 !B  TV0 DUP 1 + 1023 >>> ; 
+
+" IPSY32-M 2005-03-23 1.0.3 " #01D5 !T         ( Identifier )
+
+#0000 HIER " IPSY32-M.BIN " $SAVE

@@ -1,0 +1,1177 @@
+( Date of last edit  2002 Aug 30 [Sat] 1200 utc       )
+( --------------------------------------------------- )
+( CMD# is now defined as a KON                        )
+( L>>> modified to call >>> with only 128 as argument )
+( ACKNMESSAGE expanded with compilation date and CMD# )
+( >>> calls in TLITERAL "  !T SCHREIB changed to L>>> )
+( Loader X blocks send 128 bytes A/D, and CMD lock    )
+( 3,4MUX[] inits added                                )
+( Magnet bytes updated - KM                           )
+( 3,4MUX[5] has IHU-2 and V Tx ON, U Rx               )
+( Magnet bytes re-ordered by 180 deg jrm              )
+( --------------------------------------------------- )
+( 2000 Dec 25  after " incident "  3,4,MUX init:      )
+( S2 TX on, IHU-2 off                                 )
+( 2 meter RX on                                       )
+( MB to S2 Tx                                         )
+( --------------------------------------------------- )
+( 2000 Dec 26 [Tue] 2018 utc                          )
+( Spin mode default                                   )
+( --------------------------------------------------- )
+( 2002 Aug 11 - W4SM                                  )
+( FEC is now modified in COMPILER and assoc. routines )
+( to also look for 3-line FEC. $CBU is enlarged,      ) 
+( and dynamically defined.  Could be "hard-wired".    )
+( **Name changed to IPS-D2 to indicate 3-Line FEC**   )
+( ----------------------------------------------------)
+( 2002-08-30  - W4SM                                  )
+( Most of German notes translated to English          )
+
+
+( Assembler CDP 1802  - JRM  1997 Feb 06 [Thu] 1447 utc )
+
+~ CDP 1802 Cross Compiler  ~ #01D3 !t        ( Banner )
+
+:prior i>      0 compileflag !b ;n
+:int   <i      1 compileflag !b ;n
+:n ,            hier $OC  !b $h incr ;n
+:int rcode entrysetup ja? !O dann ;n
+:int code  entrysetup ja? hier vert !O
+                      dann ;n
+16 feld $jerror ~ Destin. off page ~ $jerror !t
+16 feld $cerror ~ PreInstr. error! ~ $cerror !t
+:n $term weg $cerror syswrite ;n
+:n $inadr  pdup exo #FF00 und
+       =0n ja? $OC !b
+          nein: weg $jerror syswrite
+          dann ;n
+:n $ad     zwo #FFF0 und =0n ja?   +n ,
+                           nein: $term
+                           dann ;n
+:n $aluact zwo #FF00 und #A500 =n
+          ja?   vert $ad
+          nein: $term
+          dann ;n
+
+:n MX   0 $aluact ;n      :n IM    8 $aluact , ;n
+
+
+:n LDN  #00 $ad ;n  :n RET   #70 , ;n     #A574 kon ADC
+:n INC  #10 $ad ;n  :n DIS   #71 , ;n     #A575 kon -DC
+:n DEC  #20 $ad ;n  :n LDXA  #72 , ;n     #A577 kon DC-
+:n LDA  #40 $ad ;n  :n STXD  #73 , ;n     #A5F0 kon LD
+:n STR  #50 $ad ;n  :n ROR   #76 , ;n     #A5F1 kon OR
+:n I/O  #60 $ad ;n  :n SAV   #78 , ;n     #A5F2 kon AND
+:n GLO  #80 $ad ;n  :n MARK  #79 , ;n     #A5F3 kon XOR
+:n GHI  #90 $ad ;n  :n 0>Q   #7A , ;n     #A5F4 kon ADD
+:n PLO  #A0 $ad ;n  :n 1>Q   #7B , ;n     #A5F5 kon -D
+:n PHI  #B0 $ad ;n  :n ROL   #7E , ;n     #A5F7 kon D-
+:n ->P  #D0 $ad ;n  :n NOP   #C4 , ;n     #0002 kon RS
+:n ->X  #E0 $ad ;n  :n SKP2  #C8 , ;n     #0000 kon NEVER
+                    :n LSIE  #CC , ;n     #0009 kon Q=1
+:n IDL  #00 , ;n    :n SHR   #F6 , ;n     #000A kon D=0
+:n SKP  #38 , ;n    :n SHL   #FE , ;n     #000B kon DF
+:n INCX #60 , ;n    :n NEXT  #D6 , ;n     #000B kon PS
+
+:n NOT    8 exo ;n      :n EF  11 +n ;n      :n BEGIN   hier ;n
+:n Y?    #30 $ad hier $h incr ;n   :n TH    hier vert $inadr ;n
+:n N:    0 Y? vert TH ;n           :n END   Y? $inadr ;n
+:n $sbrt zwo 4 und >0n ja? vert ( Provoziert fehler )
+                     dann $ad ;n
+:n LEND      #C0 $sbrt dup 256 /n , , ;n
+:n LSKP      #C4 $sbrt ;n
+                    ( End 1802 Assembler )
+
+( ----------------------------------------------------------- )
+( Now follows the self-checking loader.  This is based on the )
+( work of DB2OS 11.10.89.  The code has been shuffled to free )
+( some memory at the end.  This loader will accommodate up to )
+( 63 blocks.  End address div #200 [one byte] is placed at    )
+( #00FC.  Block CRCs are placed at #0180 on, and the loader's )
+( CRC at #01FC. A/D for 128 bytes, CMD lock   JRM 1997 Mar 03 )
+( ----------------------------------------------------------- )
+~ Compiling IPS-D2         ~ #01D3 !t    ( Information splash )
+
+X>>               ( Initialise and enter Cross-compile mode )
+( SELF-CHECKING LOADER FOR IPS-D2, mod. KM, 17.08.1997 )
+
+0 $OC dup #2020 vert !n   dup 1 +n 511 l>>>
+( FILL FREE POSITIONS WITH #20 )
+
+#0000 $h !n
+NOP #0 DEC NOP ( SET DMA ON )
+
+9 LD IM 1 PLO  0 GHI (0) 1 PHI   1 ->P
+( PUT #0009 JUMP IN R.1 )
+
+RS PLO #02 LD IM RS PHI ( #0200 -> R2 )
+#58 LD IM RS STR RS INC ( X AT BUFFER START )
+
+BEGIN ( FILL BUFFER WITH BLANKS - #011)
+ #20 LD IM RS STR RS INC RS GHI #04 XOR IM
+D=0 END
+
+BEGIN ( REMAINDER OF MEMORY DELETION, 16K Memory  - #01A)
+ #00 LD IM RS STR RS INC RS GHI #3F XOR IM (#400 - #3EFF incl)
+D=0 END
+
+#29 LD IM 3 PLO  1 GHI 3 PHI  3 ->P
+(0)       8 PHI  9 PLO
+#01 LD IM 1 PHI           5 PHI
+#65 LD IM 1 PLO #39 LD IM 5 PLO (LADE AND CRC ROUTINES)
+#04 LD IM 9 PHI
+#03 LD IM #A PHI #B PHI
+#80 LD IM #A PLO #B PLO (SYSPAGE AND CRC-POINTER)
+          RS PLO #A ->X
+
+( SELF-CHECKING 1. BLOCK  - #042)
+#FF LD IM #A INC #A STR #A INC #A STR   (1. SEED)
+#03 GHI (0) #F PLO #F PHI
+BEGIN BEGIN #A3 LD IM RS DEC RS STR #F LDA #B STR 5 ->P
+      #F GLO #FE XOR IM
+      D=0 END #F GHI #01 XOR IM
+D=0 END
+#02 LD IM #F PLO #F PHI #F INC (RF = #0203)
+LD MX #A DEC OR MX D=0 Y? #41 LD IM #F STR TH #F DEC
+
+( NEW CRC-VORBES.  - #06A)
+#FF LD IM #A STR #A INC #A STR
+
+( SYNCH-VEKTOR UEBERTREAGEN  - #06F)
+#FB LD IM #C PLO #75 LD IM #D PLO #01 LD IM #D PHI #C PHI
+BEGIN #D LDA #C STR #C INC #C GLO
+D=0 END
+
+( TRANSPONDER INIT  - #080)
+#94 LD IM #0 DEC #A PLO #20 LD IM #A STR 7 I/O
+
+(HERE BEGINS THE 20 MS ROUTINE  - #087)
+BEGIN BEGIN
+      1 EF END
+
+(A/D-WANDLER  - #089)                       ( 128 bytes )
+#A ->X #D7 LD IM #A PLO LD MX #C PLO 1 ADD IM #7F AND IM
+#A STR 5 I/O #C GLO #A PLO 9 I/O
+
+(E/B-ROUTINE  - #098)
+#D8 LD IM #A PLO LD MX
+D=0 NOT Y? 1 D- IM #A STR #01 LD IM 0 PHI #FB LD IM 0 PLO
+        N: 0 GHI #04 XOR IM D=0 Y? #70 LD IM #A STR
+                                TH
+        TH
+(INPUT CHECKING  - #0B1)
+#09 GHI 1 AND IM
+D=0 Y? #09 GLO D=0
+       Y? #08 GHI D=0 NOT
+          Y? (BLOCK-CHECK) #09 GHI #7A ADD IM #D PLO 1 LD IM
+             #D PHI #D LDA #B STR #A3 LD IM RS DEC RS STR 5 ->P
+                    #D LDA #B STR #A3 LD IM RS DEC RS STR 5 ->P
+             #81 LD IM #A PLO #A LDA OR MX
+             D=0 NOT Y? #09 GHI 2 D- IM #9 PHI
+                     TH
+             #FF LD IM STXD #A STR (NEUER SEED) 0 LD IM #8 PHI
+             #F INC #9 GHI SHR #3F ADD IM #F STR #F DEC (letter)
+          TH
+       TH
+    N: #8 PHI
+    TH
+#D9 LD IM #A PLO #E I/O #18 AND IM D=0 NOT Y? #0A LD IM
+                                           TH
+#20 OR IM #F STR    ( #20 = space, #2A = "*" - CMD lock )
+#09 GHI #1E XOR IM ( LOAD END )
+D=0 END ( ^---  2*{nblocks-1} )
+
+(IPS-INIT  - #0FF)
+#04 LD IM #0 DEC 5 PHI #E9 LD IM  5 PLO ( REMEX-ENTRY         )
+#04 LD IM  6 PHI #80 LD IM  6 PLO ( EMULATOR-PC               )
+#04 LD IM  7 PHI #C2 LD IM  7 PLO ( PSEUDO-PC ON CHAIN        )
+#00 LD IM  8 PHI #01 LD IM  8 PLO ( C-FLAG AND INT-ENABLE     )
+#04 LD IM #A PHI #00 LD IM #A PLO ( SYS-PAGE POINTER          )
+#03 LD IM #B PHI #78 LD IM #B PLO ( PARAMETER STACK POINTER   )
+#04 LD IM  1 PHI #94 LD IM  1 PLO ( INTERRUPT POINTER, IPS    )
+#F8 LD IM  2 PLO #07 LD IM  2 PHI ( RETURN STACK POINTER      )
+#00 LD IM  9 PHI #00 LD IM  9 PLO ( $IP FROM $RBU             )
+PS ->X NEXT
+
+( CRC-ROUTINE - #138)
+BEGIN RET
+#B ->X #B INC 8 LD IM #E PLO
+ BEGIN #B DEC LD MX ROL #B STR #B INC
+ 0 LD IM ROR #E PHI
+ LD MX SHL #B STR #B INC #E GHI XOR MX ROL
+ DF Y? #10 XOR IM STXD LD MX #21 XOR IM #B STR SKP
+    TH STXD #E DEC #E GLO
+ D=0 END
+#B DEC LD MX ROL (RESTORE DF) RS ->X
+0 END
+
+( INTERRUPT ROUTINE - #163)
+BEGIN RS LDA (POP D) RET RS DEC SAV
+RS DEC RS STR (D) RS DEC #C I/O LD MX 9 STR 9 INC
+#B STR #21 LD IM RS STR 5 ->P (CALL CRC)
+0 END
+
+(SYNCH-VEKTOR IMAGE - #175)
+#50 , #39 , #15 , #ED , #30 ,
+                ( End Self-Checking Loader )
+( ----------------------------------------------------------- )
+
+(    IPS-D1 for the Amsat P3-D Flight IHU, KM 30.07.1997     )
+
+( This version is based on JRM's IPS-C3 file of 8.2.97       )
+(   Definitions for :INT :PRIOR :HPRI amended                )
+(   Definitions that include DANN amended                    )
+(   msby in $SCODE changed to 256 /n                         )
+
+~ Compiling IPS-D2        ~ #01D3 !t    ( Information splash )
+
+X>>  #3E00 $O !n   ( Set X-compile mode; move target )
+                   ( zone down #200 bytes.           )
+
+(IPS-D2, BUILDING THE SYSTEM )
+#0400 $h !n
+0 hier !O hier $OC dup 1 +n #FF l>>> (ERST MAL ALLES LOESCHEN)
+
+( FURTHER POPULATING SYSPAGE )
+#0414 $h !n #20 ,   ( TRANSPONDER, GB IN PSK MODUS )
+#041A $h !n #0A ,   ( ES LOCKOUT = 10 COUNTS = 14 GRAD )
+#041F $h !n #01 ,   ( Spin mode, default )
+#0464 $h !n #05 ,   ( GB-CW GESCHW. 100 MS PUNKLAENGE )
+
+#042E $h !n         ( STOPWATCHES )
+1 , 0 , 0 , 0 ,  1 , 0 , 0 , 0 ,
+1 , 0 , 0 , 0 ,  1 , 0 , 0 , 0 ,
+
+( 3,4MUX images.  JRM/SM 2000.12.25 )
+#5FFE #0440 !O ( 3,4MUX[1]  Wheel 1  0.0 rpm                  )
+#5FFE #0442 !O ( 3,4MUX[2]  Wheel 2  0.0 rpm                  )
+#5FFE #0444 !O ( 3,4MUX[3]  Wheel 3  0.0 rpm                  )
+#0054 #0446 !O ( 3,4MUX[4]  SS ON 1/3 NOMINAL.  side ES ON    )
+#0001 #0448 !O ( 3,4MUX[5]  S2 TX on, IHU-2 off )
+#0004 #044A !O ( 3,4MUX[6]  2 meter RX on       )
+#6400 #044C !O ( 3,4MUX[7]  Matrix MB to S2 Tx  )
+#0000 #044E !O ( 3,4MUX[8]    not used          )
+#0000 #0450 !O ( 3,4MUX[9]  Leila               )
+#0000 #0452 !O ( 3,4MUX[A]    not used          )
+
+#0480 $h !n ( EMULATOR )
+BEGIN  7 LDA #C PLO 7 LDA #C PHI ( @PC -> HP )
+       #C LDA 3 PLO #C LDA 3 PHI ( @HP -> R3 )
+       BEGIN 3 ->P
+       vert
+1 EF END
+       #08 LD IM 3 PHI #00 LD IM 3 PLO ( JUMP TO 20 MS @ #800 )
+       00 END   ( END EMULATOR )
+
+( INTERRUPT-HANDLER, BEGIN: #0493, RE-ENTER: #0494 )
+BEGIN RET
+( INT ) RS DEC SAV RS DEC RS STR
+        8 GLO D=0 NOT Y? 9 ->X #C I/O RS ->X
+                      TH
+        9 INC RS LDA
+0 END
+
+( Z-PRESETS AND MAGNET-CONTROL P3D )  #04A4 $h !n
+#FE , #33 , #F8 , #33 ,   #0C , #0D , #09 , #0B , #0A , #0E ,
+
+( CLOCK <UHR> AND STOPWATCH LIMITS )
+100 , 60 , 60 , 24 , 0 , 0 ,   98 , 59 , #FF , #FF ,
+( BIT LIST )
+#01 , #02 , #04 , #08 , #10 , #20 , #40 , #80 ,
+
+
+( REMEX-ROUTINE ) #04E8 $h !n
+BEGIN NEXT
+( REMEX ) #7 GLO RS DEC RS STR   #7 GHI RS DEC RS STR
+          #3 GLO #7 PLO          #3 GHI #7 PHI
+          #C GLO PS DEC PS STR   #C GHI PS DEC PS STR
+0 END
+( TELEMETRY SYNC VECTOR )
+#50 , #39 , #15 , #ED , #30 , ( END BUILDING PAGE #0400 )
+( RTTY-CODES ) #0702 $h !n
+#08 , #B8 , #B8 , #B8 , #B8 , #B8 , #B8 , #B8 ,
+#B8 , #B8 , #B8 , #B8 , #B8 , #B8 , #B8 , #BA ,
+#AC , #AE , #A6 , #82 , #94 , #A0 , #AA , #8E ,
+#8C , #B0 , #B8 , #B8 , #10 , #B8 , #04 , #B8 ,
+#B8 , #46 , #72 , #5C , #52 , #42 , #5A , #74 ,
+#68 , #4C , #56 , #5E , #64 , #78 , #58 , #70 ,
+#6C , #6E , #54 , #4A , #60 , #4E , #7C , #66 ,
+#7A , #6A , #62 , #B8 , #B8 , #B8 , #B6 , #7E ,
+
+( CW CODES )
+#00 , #6A , #6A , #6A , #6A , #6A , #6A , #6A ,
+#6D , #6D , #6A , #6A , #73 , #6A , #6A , #29 ,
+#3F , #3E , #3C , #38 , #30 , #20 , #21 , #23 ,
+#27 , #2F , #47 , #55 , #00 , #31 , #00 , #4C ,
+#6A , #06 , #11 , #15 , #09 , #02 , #14 , #0B ,
+#10 , #04 , #1E , #0D , #12 , #07 , #05 , #0F ,
+#16 , #1B , #0A , #08 , #03 , #0C , #18 , #0E ,
+#19 , #1D , #13 , #6A , #6A , #6A , #00 , #00 ,
+( END CODE TABLE )
+
+( FILL $EBU WITH BLANKS AND INTERMEDIATE MESSAGE )
+#2020 #500 ( $EBU ) !O
+#500 $OC dup 01 +n 511 l>>>
+
+~ LOADING PROCEDURE IPS-D2 OK ~  #540 $OC !t
+
+( P3-D 20 MS PART, IPS-D2,  PROVISIONAL TEST VERSION )
+
+#0800 $h !n
+#A GHI #D PHI ( #D ALSO SYSPAGE POINTER )
+
+(A/D WANDLER )
+#A ->X #57 LD IM #A PLO LD MX #80 OR IM #C PLO 1 ADD IM
+#7F AND IM #A STR 5 I/O ( OUT ) #03 LD IM #C PHI #C ->X
+9 I/O #A ->X ( INPUT, ALTER K. )
+
+( EB OUTPUT ROUTINE )
+#58 LD IM #A PLO LD MX #30 XOR IM
+D=0 NOT Y? LD MX D=0 NOT Y? 1 D- IM #A STR
+                         TH #A GHI 0 PHI #FB LD IM 0 PLO
+        N: 0 GHI #07 XOR IM D=0
+           Y? 0 GLO #02 XOR IM D=0 Y? #2F LD IM #A STR
+                                   TH
+           TH
+        TH
+
+
+( SENSOR SERVICE P3-D )
+#1F LD IM #A PLO LD MX D=0 NOT
+Y? ( SPIN-MODUS )
+( SOLAR ANGLE SS-2 )
+2 EF Y? #11 LD IM #A PLO  #D I/O  6 I/O  LD MX #02 OR IM #A STR
+     TH
+( SS-1 OR CURRENT COUNTS )
+#14 LD IM #A PLO LD MX #40 OR IM #A STR 7 I/O ( MUX=1 )
+2 EF Y? (SS-1 = COUNT) #10 LD IM #A PLO #D I/O 6 I/O #A INC
+        LD MX #01 OR IM #A STR
+     N: (SYNC COUNT)  #13 LD IM #A PLO #D I/O
+     TH
+( DETERMINING COUNTER SQUINT )
+#10 LD IM #A PLO #A LDA ( SS-1 ) ADD MX ( SS-2 ) SHR #F PLO
+#40 AND IM D=0 NOT Y? #F GLO #80 XOR IM #F PLO ( VORZ. OK )
+                   TH
+DF Y? #F INC ( ROUNDS )
+   TH
+( PLACING SQUINT CORRECTIONS )
+#15 LD IM #A PLO #F GLO #A STR #A DEC #A DEC -D MX #F PHI
+#5D LD IM #A PLO #F GHI #A STR
+( R.1#F AND #5D CONTAINS KORR. COUNT )
+
+( EARTH SENSORS )
+#14 LD IM #A PLO LD MX #3F AND IM #A STR ( MUX-WORD=0 )
+3 EF Y? #80 LD IM #C PLO #1C LD IM #D PLO ( 1.FLAG )
+        #1A LD IM #A PLO LD MX #E PLO ( CHECK ANGLE )
+        BEGIN #14 LD IM #A PLO #C GLO OR MX #A STR 7 I/O
+        2 EF Y? #D GLO #A PLO #A DEC LD MX #E PHI ( IF CLOSE )
+                #D I/O #F GLO -D MX #A STR #F PHI ( CORRECTED )
+                #80 ADD IM LD MX DF Y? 0 -D IM
+                                    TH #A STR ( AMOUNT )
+                #E GLO -D MX DF Y? #F GHI #E PHI 1 LD IM #D STR
+                                TH ( ABSOLUTE ANGLE > ALS CLOSE:OK )
+                #E GHI #A STR 6 I/O
+             TH #D INC #D INC #C GLO #40 ADD IM #C PLO
+        D=0 END
+     TH
+N:( 3-AXIS MODE, ONLY EARTH SENSOR )
+#46 LD IM #A PLO LD MX #04 XOR IM #A STR ( TOGGLE EDGE )
+#04 AND IM SHR SHR #01 XOR IM #F PLO ( EDGE IDENTIFICATION )
+3 EF Y? #80 LD IM #C PLO #1C LD IM #D PLO ( 1. FLAGGE )
+        BEGIN #14 LD IM #A PLO #C GLO OR MX #A STR 7 I/O
+              2 EF Y? #F GLO #D STR 6 I/O
+                   TH
+              #D INC #C GLO #40 ADD IM #C PLO
+        D=0 END
+     TH
+TH
+( NOW MUX=0 ) #14 LD IM #A PLO LD MX #3F AND IM #A STR 7 I/O
+
+
+
+
+( MAGNET CONTROL )
+#5D LD IM #A PLO LD MX #F PHI ( KORR. COUNT )
+#20 LD IM #A PLO #A LDA ( MODUS ) SHR ( ON? )
+DF Y? SHR ( NOT FIXED ) DF NOT Y? #F GHI     ( SPIN-COUNT )
+                                  -D MX SKP  ( DESPIN )
+                               TH LD MX      ( FIXED ANGLE )
+( ? ) 0   ADD IM ( ASSEMBLY OFFSET ) #C PHI
+      #A8 LD IM #D PLO ( BEGINNING OF CONTROL WORD LIST ) #C GHI
+      BEGIN 43 D- IM DF Y? #D INC
+vert  0 END             TH
+      #D LDA
+   TH #A INC XOR MX #0F AND IM XOR MX #A STR 2 I/O
+      #BE LD IM #A PLO 1 I/O #B2 LD IM #A PLO 1 I/O
+
+( GB-HANDLER )
+#14 LD IM #A PLO #67 LD IM #D PLO LD MX #D STR
+#62 LD IM #A PLO #A LDA #F PLO #A LDA #F PHI #A LDA #C PHI (N)
+LD MX D=0 NOT Y? 1 D- IM #A STR
+              TH
+D=0 Y? #A INC #A LDA ( STATUS ) SHR DF ( RUN IN DF )
+      Y? D=0 Y? ( CW ) LD MX 1 AND IM ( GB ON ? )
+               D=0 Y? LD MX 1 OR IM #A STR #A DEC #A DEC
+                      #C GHI #A STR
+                   N: #A INC LD MX ( M )
+                      D=0 Y? #F LDA D=0 ( CHAR )
+                             Y? #A DEC #A DEC #A STR (STATUS=0)
+                                #A INC #A INC
+                             N: #20 D- IM #3F AND IM #42 ADD IM
+                                #E PLO #07 LD IM #E PHI #E LDA
+                             TH
+                          TH SHR #A STR (M) #A DEC #A DEC #A DEC
+                          D=0 Y? #C GHI #A STR ADD MX
+                          N: #C GHI #A STR ( RA ON SMALL N )
+                             DF Y? ADD MX ADD MX #A STR
+                                TH
+                             #A INC #A INC LD MX #FE AND IM
+                          TH #A STR
+                   TH
+             N: ( RTTY ) #A INC LD MX ( M )
+                D=0 Y? #F LDA ( CHAR ) #A DEC #A DEC ( =STATUS )
+                      D=0 Y? LD MX #FE AND IM #A STR 1 LD IM
+                          N: #20 D- IM #3F AND IM #02 ADD IM #E
+                             PLO #07 LD IM #E PHI #E LDA #E PLO
+                             XOR MX #C0 AND IM #C0 XOR IM
+                             D=0 Y? ( WRONG CASE ) #F DEC
+                                   LD MX #C0 XOR IM #A STR
+                                   #80 ADD IM #FE LD IM ( BU )
+                                   DF Y? ( ZI ) #F6 LD IM
+                                      TH #E PLO
+                                 TH  #E GLO #C0 OR IM
+                          TH  #A INC #A INC
+                    TH  SHR #A STR #A DEC LD MX 2 OR IM
+                        DF Y? 2 XOR IM TH #A STR
+             TH
+         #62 LD IM #A PLO #F GLO #A STR #A INC #F GHI #A STR
+      TH
+    TH #14 LD IM #A PLO #67 LD IM #D PLO #D LDA #A STR 7 I/O
+
+( TIME )
+#28 LD IM #A PLO #AE LD IM #D PLO
+LD MX 2 ADD IM #A STR 5 LD IM #C PLO
+BEGIN #D LDA XOR MX D=0
+  Y? #A STR #A INC LD MX 1 ADD IM #A STR #C DEC #C GLO
+vert D=0 END
+  TH
+
+SKP #A ->X  ( ELIMINATES PAGE PROBLEM )
+
+( STOPWATCHES )
+#2E LD IM #C PHI ( SU1 IN RC.1 )
+BEGIN #C GHI #A PLO #B4 LD IM #D PLO LD MX ( 1/100 S )   SHR
+   DF NOT Y? LD MX 2 D- IM #A STR
+             BEGIN #D LDA -D MX ( T - LIMIT )
+             DF Y? #D DEC #D LDA #A STR #A INC LD MX 1 D- IM
+                   #A STR #A GLO 3 AND IM 1 XOR IM
+             vert D=0 END
+                TH #C GHI #A PLO 4 LD IM #C PLO
+             BEGIN  #A LDA D=0
+                    Y? #C DEC #C GLO
+         vert D=0 END #C GHI #A PLO 1 LD IM #A STR
+           TH       TH
+      #C GHI 4 ADD IM #C PHI #3E XOR IM
+D=0 END
+
+( INPUT E, A & B )
+#59 LD IM #A PLO #E I/O #A INC #A I/O #A INC #B I/O
+
+( OUTPUT 3,4 MUX AND REMOVE FLAG )
+#3F LD IM #A PLO 0 LD IM #A STR #A INC ( FLAG DELETED )
+BEGIN #3 I/O #4 I/O #A GLO #52 XOR IM
+D=0 END
+
+( Z - THE ORBIT CLOCK )
+#23 LD IM #A PLO LD MX 1 D- IM #A STR #A INC
+DF NOT Y? ( UNDERFLOW ) LD MX 1 D- IM #A STR
+       TH #A INC
+DF NOT Y? ( Z-INCR ) #A6 LD IM #D PLO LD MX 1 ADD IM #A STR
+          D=0 Y? #A INC LD MX 1 ADD IM #A STR
+                 D=0 Y? #A INC LD MX 1 ADD IM #A STR
+                     TH
+                 #D DEC #D DEC ( ON N-1 )
+              TH
+        #23 LD IM #A PLO #D LDA #A STR #A INC #D LDA #A STR
+      TH
+
+( CLEANUP SOFT ERRORS, R4 IS PERMANENT CLEAN POINTER  )
+#43 LD IM RS DEC RS STR RS ->X DIS RS DEC ( X=4, P=3  )
+LD MX STXD LD MX STXD RS ->X RET  ( ONCE EVERY 10 MIN )
+
+( CMD LIMIT MONITOR )
+9 GHI 2 D- IM
+DF Y? 0 LD IM 9 PHI 8 PLO ( CLOSE INTERRUPTS )
+      #DD LD IM #A PLO 1 LD IM #A STR ( DATA-IN )
+   TH
+NEXT
+            ( END 20-MS PART )
+
+
+
+( CODE ROUTINES FOR CDP 1801, METAFORM FOR IPS-D2 )
+#B00 $h !n
+( VAREX ) hier  $ccodes 2 +n !n
+#C GLO PS DEC PS STR #C GHI PS DEC PS STR NEXT
+( CONSEX ) hier $ccodes 4 +n !n
+#C LDA PS DEC PS STR #C LDA PS DEC PS STR NEXT
+code $POLYNAME
+     PS ->X PS INC PS LDA #E PLO PS INC PS LDA #F PLO SHL
+     LD MX ADC MX PS DEC PS STR #E GLO XOR MX #E PLO
+     PS INC PS LDA #F PHI SHL LD MX #E PHI ADC MX PS DEC PS STR
+     PS INC #E GLO PS STR #F GLO XOR MX PS STR #F GHI SHR
+     #F GLO ROR #F PLO XOR MX PS STR #F GLO SHR XOR MX PS STR
+     #E GHI SHL LD MX ADC MX STXD PS DEC PS DEC NEXT
+
+code 2BLITERAL PS DEC 7 LDA PS STR PS DEC 7 LDA PS STR NEXT
+code 1BLITERAL PS DEC 7 LDA hier PS STR PS DEC 0 LD IM PS STR
+               NEXT
+code @B PS LDA #C PHI PS ->X LD MX #C PLO ( ADR IN RC )
+        #C LDA              0 END
+code @  PS LDA #C PHI PS ->X LD MX #C PLO ( ADR IN RC )
+        #C LDA STXD #C LDA PS STR NEXT
+
+
+code !  PS LDA #C PHI PS LDA #C PLO  ( ADR IN RC )
+        PS LDA #C INC #C STR #C DEC PS LDA #C STR NEXT
+code !B PS LDA #C PHI PS LDA #C PLO ( ADR IN RC )
+        PS INC PS LDA #C STR NEXT
+code BRONZ PS INC PS LDA SHR
+           DF Y? 7 INC 7 INC NEXT
+              TH hier 7 LDA #C PLO 7 LDA 7 PHI #C GLO 7 PLO NEXT
+                 rcode JUMP
+
+code RETEX 2 LDA 7 PHI 2 LDA 7 PLO NEXT
+code $TUE  6 DEC 6 DEC 6 DEC 6 DEC 6 DEC PS LDA #C PHI
+           PS LDA #C PLO NEXT
+code CHS   PS INC PS ->X 0 LD IM D- MX STXD
+                         0 LD IM DC- MX PS STR NEXT
+
+
+code LOOPEX 2 ->X  2 LDA #E PHI 2 LDA #E PLO #E INC ( INDEX )
+       hier ( LC ) 2 LDA #F PLO #E GLO -D MX #F GLO 2 DEC 2 STR
+                   #E GHI -DC MX
+          #80 AND IM D=0 Y? ( LOOP ) 7 LDA #C PLO 7 LDA 7 PHI
+                            #C GLO 7 PLO #E GLO 2 DEC STXD
+                            #E GHI 2 STR NEXT
+                         TH (END) 7 INC 7 INC 2 INC 2 INC NEXT
+code +LOOPEX 2 ->X PS LDA ADD MX #E PHI 2 INC PS LDA ADD MX
+             #E PLO 2 INC dup DF END ( LC BEI DF NICHT )
+             #E GHI 1 ADD IM #E PHI dup 0 END
+code $JEEX   2 ->X PS LDA #C PLO PS LDA 2 DEC STXD #C GLO
+             2 STR PS LDA #E PHI PS LDA #E PLO
+             7 LDA #C PLO 7 LDA 7 PHI #C GLO 7 PLO 0 END
+
+
+
+code DUP PS LDA #C PLO PS ->X LD MX PS DEC PS DEC STXD
+         #C GLO PS STR NEXT
+code ZWO PS INC PS INC PS LDA #C PLO PS ->X LD MX
+         PS DEC PS DEC PS DEC PS DEC STXD #C GLO
+         PS STR NEXT
+code WEG PS INC PS INC NEXT
+
+
+code VERT PS LDA #F PHI PS LDA #F PLO PS LDA #E PHI PS ->X
+          LD MX #E PLO  #F GLO STXD #F GHI STXD
+          #E GLO STXD #E GHI PS STR NEXT
+code RDU PS GLO #D PLO PS GHI  #D PHI
+         #D LDA #E PHI #D LDA #E PLO 4 LD IM #C PLO
+         BEGIN #D LDA PS STR PS INC #C DEC #C GLO
+         D=0 END
+         #E GLO #D DEC #D STR #E GHI PS STR
+         PS DEC PS DEC PS DEC PS DEC  NEXT
+
+code R>S 2 LDA #C PLO 2 LDA PS DEC PS STR PS DEC #C GLO
+         PS STR NEXT
+code S>R PS LDA #C PLO PS LDA 2 DEC 2 STR #C GLO 2 DEC
+         2 STR NEXT
+code I   2 GLO #D PLO 2 GHI #D PHI
+         #D LDA #C PLO #D LDA PS DEC PS STR #C GLO PS DEC
+         PS STR NEXT
+
+code =0  PS LDA PS ->X OR MX
+           D=0 Y? hier 1 LD IM
+        vert   N: hier 0 LD IM
+        vert   TH hier STXD SHR PS STR NEXT
+code <0  PS ->X PS LDA #80 AND IM dup D=0 NOT END rdu vert dup
+         rdu 0 END
+code >0  PS ->X PS LDA #C PLO #80 AND IM D=0 END
+         #C GLO OR MX D=0 END 0 END
+code NICHT PS ->X #FF LD IM XOR MX PS STR
+           PS INC #FF LD IM XOR MX STXD NEXT
+code UND PS ->X PS LDA #C PLO PS LDA PS INC AND MX STXD
+         #C GLO AND MX PS STR NEXT
+code ODER PS ->X PS LDA #C PLO PS LDA PS INC OR MX STXD
+         #C GLO OR MX  PS STR NEXT
+code EXO PS ->X PS LDA #C PLO PS LDA PS INC XOR MX STXD
+         #C GLO XOR MX PS STR NEXT
+
+code SBIT  PS LDA #D PHI PS LDA #D PLO #D ->X
+           PS INC PS LDA #07 AND IM #B8 ADD IM #A PLO
+           #A LDA OR MX #D STR NEXT
+
+code CBIT  PS LDA #D PHI PS LDA #D PLO #D ->X
+           PS INC PS LDA #07 AND IM #B8 ADD IM #A PLO
+           #A LDA #FF XOR IM AND MX #D STR NEXT
+code >>>   PS INC PS LDA #C PLO
+           PS LDA #F PHI PS LDA #F PLO
+           PS LDA #E PHI PS LDA #E PLO
+           BEGIN #E LDA #F STR #F INC #C DEC #C GLO
+           D=0 END NEXT
+
+code DIN-ENABLE  #1 LD IM #8 PLO SHR #8 PHI (C-FLAG=0) NEXT
+code PWEG        PS INC PS INC PS INC PS INC NEXT
+code F-VERGL PS INC PS LDA #C PLO PS LDA #F PHI PS LDA #F PLO
+             PS LDA #E PHI PS LDA #E PLO   #F ->X
+             PS DEC 1 LD IM PS STR
+          BEGIN #E LDA D- MX #F INC
+            D=0 NOT Y? 0 LD IM DF Y? 2 LD IM
+                                  TH PS STR
+                    TH #C DEC #C GLO
+          D=0 END PS DEC PS STR NEXT
+
+code +    PS ->X PS LDA #C PLO PS LDA PS INC ADD MX STXD
+          #C GLO ADC MX PS STR NEXT
+
+code -    PS ->X PS LDA #C PLO PS LDA PS INC -D  MX STXD
+          #C GLO -DC MX PS STR NEXT
+
+code P*   PS ->X PS LDA #F PHI PS LDA #F PLO PS LDA #E PHI
+          LD MX #E PLO  4 LD IM  #C PLO
+BEGIN 0 LD IM STXD #C DEC #C GLO
+D=0 END PS INC 16 LD IM #C PLO
+BEGIN PS INC PS INC PS INC LD MX SHL STXD LD MX ROL STXD
+                           LD MX ROL STXD LD MX ROL PS STR
+#E GHI ROL #E PHI
+DF Y? PS INC PS INC PS INC #F GLO ADD MX STXD #F GHI ADC MX STXD
+      DF Y? LD MX 1 ADD IM PS STR
+         TH PS DEC
+      DF Y? LD MX 1 ADD IM PS STR
+         TH
+   TH #C DEC #C GLO 8 XOR IM D=0 Y? #E GLO #E PHI
+                                 TH #C GLO
+D=0 END  NEXT
+code P/MOD  PS ->X 17 LD IM #C PLO #A GHI #C PHI ( C3=0 )
+            PS LDA #F PHI PS LDA #F PLO
+BEGIN #F GLO PS INC -D MX #E PLO PS DEC
+   #F GHI -DC MX #E PHI DF NOT Y? #C GHI SHR
+                               TH
+   DF Y? #E GHI PS STR PS INC #E GLO PS STR SKP
+      TH PS INC PS INC PS INC LD MX ROL STXD LD MX ROL STXD
+   #C DEC #C GLO D=0 Y? DF Y? #FF LD IM PS INC PS INC STXD
+                              STXD STXD PS STR NEXT
+                           TH PS DEC NEXT
+                     TH
+   LD MX ROL STXD LD MX ROL PS STR ROL #C PHI
+0 END
+
+code $PSSETZEN PS LDA #C PLO PS LDA PS PLO #C GLO PS PHI NEXT
+code $PSHOLEN  PS GHI #C PLO PS GLO PS DEC PS STR #C GLO
+               PS DEC PS STR NEXT
+hier 1 -n
+rcode RUMPELSTILZCHEN
+( DEFEX ) hier  $ccodes !n
+7 GLO 2 DEC 2 STR 7 GHI 2 DEC 2 STR
+#C GLO 7 PLO #C GHI 7 PHI NEXT
+
+code CYC2 ( FOR POLYNOMIAL X16 + X12 + X5 + 1 )
+ PS ->X PS INC PS INC 8 LD IM #C PLO
+ BEGIN PS DEC LD MX ROL PS STR PS INC 0 LD IM ROR #C PHI
+       LD MX SHL PS STR PS INC #C GHI XOR MX ROL
+       DF Y? #10 XOR IM STXD LD MX #21 XOR IM PS STR SKP
+          TH STXD #C DEC #C GLO
+D=0 END NEXT
+
+
+code W/DECODE  PS ->X  8 LD IM #C PLO
+BEGIN  LD MX ADD MX PS STR DF Y? #1 LD IM TH #E PLO
+PS INC LD MX ADD MX PS STR
+PS INC LD MX DF Y? ADD MX #1 OR IM #E INC SKP TH ADD MX PS STR
+       #10 AND IM D=0 NOT Y? #E INC TH
+PS INC LD MX DF Y? ADD MX #1 OR IM SKP TH ADD MX PS STR
+       #10 AND IM D=0 NOT Y? #E INC TH
+PS INC LD MX DF Y? ADD MX #1 OR IM SKP TH ADD MX PS STR
+       #04 AND IM #D PLO ( EVEN ) D=0 NOT Y? #E INC TH
+       DF Y? #D INC TH ( DATA-MERK )
+#E GLO #1 AND IM #E PLO SHR PS INC
+LD MX DF Y? ADD MX #1 OR IM SKP TH ADD MX PS STR PS INC
+       #40 AND IM D=0 NOT Y? #E INC TH
+LD MX DF Y? ADD MX #1 OR IM SKP TH ADD MX PS STR PS INC
+       #40 AND IM D=0 NOT Y? #E INC TH
+LD MX DF Y? ADD MX #1 OR IM SKP TH ADD MX PS STR PS DEC ( S2 )
+       #04 AND IM D=0 NOT Y? #E INC TH #E GLO 3 D- IM ( DF=KOR.)
+DF Y? LD MX #40 XOR IM PS STR PS DEC LD MX #41 XOR IM PS STR
+      PS DEC LD MX #04 XOR IM PS STR
+   N: PS DEC PS DEC
+   TH PS DEC PS DEC PS DEC #D GLO #1 AND IM XOR MX PS STR
+PS DEC #C DEC #C GLO
+D=0 END NEXT
+
+code !S   PS INC PS LDA #0F AND IM #A PLO #C PLO #A ->X
+          PS INC PS LDA #A STR #2 I/O #00 LD IM #A PLO
+          #C GLO #A STR #1 I/O #A DEC #A GLO ( 0 )
+          #A STR #1 I/O NEXT
+
+code TBIT PS LDA #D PHI PS LDA #D PLO #D ->X
+     PS INC PS LDA #07 AND IM #B8 ADD IM #A PLO #A LDA AND MX
+     D=0 NOT Y? #01 LD IM
+             TH
+     PS DEC PS STR SHR PS DEC PS STR NEXT
+( END CODE ROUTINES FOR IPS-D2      )
+
+
+( IPS-D2, CDP 1802 METAFORM, PART A )
+#0380 kon A/D
+#0428 kon UHR
+#042E kon SU0
+#0432 kon SU1
+#0436 kon SU2
+#043A kon SU3
+#04C4 kon KETTE
+#0458 kon T/Z
+0 kon 0   1 kon 1   2 kon 2   4 kon 4
+
+( CONVERSION OF THE ENTRY CODES )
+'n 2BLITERAL 'n 1BLITERAL 'n BRONZ 'n JUMP 'n $JEEX  'n LOOPEX
+'n +LOOPEX   'n RETEX  $ccodes 6 +n 8 !fk
+                 ( END OF CONVERSION )
+
+
+
+ ( DEFINITIONS DOWN )
+:n >      - >0       ;n               :n <>   - =0 NICHT   ;n
+:n =      - =0       ;n               :n >=   - <0 NICHT   ;n
+:n <      - <0       ;n               :n <=   - >0 NICHT   ;n
+:n RDO RDU RDU       ;n               :n PDUP ZWO ZWO      ;n
+:n *    P* WEG       ;n               :n P/   P/MOD WEG    ;n
+:n /MOD   0 VERT P/MOD ;n             :n /    /MOD WEG     ;n
+:n INCR   DUP @ 1 + VERT ! ;n         :n MOD /MOD VERT WEG ;n
+#04DE kon $PI ( SCAN POINTER FOR COMPILER   )
+#04E0 kon $P1 ( START POINTER FOR COMPILER  )
+#04E2 kon $P2 ( END OF INPUT BUFFER FLAG    )
+#04E4 kon $P3 ( AUXILIARY POINTER FOR $SUCH )
+#04E6 kon $H  ( POINTER FOR MEMORY STORAGE  )
+#01C0 kon SYSLINE
+#04DC kon READYFLAG
+#04DD kon DATA-IN
+#0460 kon CMD#
+#0378 kon $SL     #7FF0 kon $ML     #0000 kon $LL
+$ccodes       @n kon DEFEX
+$ccodes 02 +n @n kon VAREX
+$ccodes 04 +n @n kon CONSEX
+#0000 kon $RBU #01FE kon $RBE  #200 kon $CBU   #500 kon $EBU
+#0425 kon Z
+#74C3 kon SCHLUESSEL
+                           ( END PART A )
+
+
+( IPS-D2, PART B: THE COMPILER )
+#0004 feld $ND        ( hashed namecode field  )
+#0001 var $RS         ( duplicate name flag    )
+#0000 var ECHO        ( failed command echo    )
+#0000 var $F1         ( first underflow position of stack )
+#0000 var $F2         ( compiler address storage )
+#0000 var $KK         ( storage for link address )
+#0000 var BASIS       ( bin, hex, dec format    )
+#0000 var BEM         ( limited input mode <LIM> flag )
+#0001 var BEA         ( addr, last recognized word, LIM mode )
+#0000 var EINGABEZAHL ( input number )
+#0000 var Z-LESEN     ( input number available flag )
+#0000 var COMPILEFLAG
+#0000 var $V1         ( storage for compiler )
+#0000 var LINK
+16 feld   STACKMESSAGE
+16 feld   MEMMESSAGE
+16 feld   NAMEMESSAGE
+16 feld   STRUCMESSAGE
+16 feld   TEXTMESSAGE
+16 feld   RSMESSAGE
+29 feld   ACKNMESSAGE
+
+( MEMORY FULL ! )
+~ SPEICHER VOLL !  ~               'n MEMMESSAGE   02 +n $OC !t
+
+( NAME MISSING ! )
+~ NAME FEHLT !     ~               'n NAMEMESSAGE  02 +n $OC !t
+
+( STACK EMPTY )
+~ STAPEL LEER !    ~               'n STACKMESSAGE 02 +n $OC !t
+
+( STRUCTURE ERROR ! )
+~ STRUKTURFEHLER ! ~               'n STRUCMESSAGE 02 +n $OC !t
+
+( TEXT ERROR ! )
+~ TEXTFEHLER !     ~               'n TEXTMESSAGE  02 +n $OC !t
+
+( DUPLICATE NAME ! )
+~ UNZUL. NAME !    ~               'n RSMESSAGE    02 +n $OC !t
+~ ( IPS-D2, 2002-08-10, #0000 ) ~  'n ACKNMESSAGE  02 +n $OC !t
+
+
+( DEFINITIONS )
+:n HIER   $H @ ;n
+:n H2INC  HIER 2 + $H ! ;n
+:n $DEP   HIER ! H2INC ;n
+:n $CEN   $RBU $PI !  1 ECHO !  0 READYFLAG !B ;n
+:n IE   $P1 @ $PI @ 1 - je I @B #80 ODER I !B
+                        nun  0 $P2 ! $CEN WEG ;n
+:n SYSWRITE SYSLINE 16 >>> 0 IE ;n
+:n L>>> anfang DUP 128 > ja? 128 - S>R PDUP 128 >>>
+                            128 + VERT 128 + VERT R>S
+       dann/nochmal DUP >0 ja?   >>>
+                           nein: PWEG WEG
+                           dann ;n
+:n TRANSPORT   $EBU #200 L>>> ;n
+:n ETRANSMIT   #70 T/Z !B #FFFF $EBU #6FF
+               je I @B CYC2 nun #700 ! ;n
+code $SCODE #E ->X
+BEGIN #E4 ( $P3 ) LD IM #A PLO #A LDA #F PLO #A LDA #F PHI
+ 'n $ND 02 +n dup 256 /n LD IM #E PHI LD IM #E PLO ( $ND -> RE )
+      #F LDA XOR MX #3F AND IM
+      D=0 Y? #E INC #F LDA XOR MX
+                     D=0 Y? #E INC #F LDA XOR MX
+vert                                D=0 Y? #E INC #F LDA XOR MX
+rdu                                           00 Y?
+vert      TH #F INC vert TH #F INC vert TH #F INC TH
+ ( GEF? ) D=0 Y? #F INC #F INC PS DEC #F GLO PS STR
+                 PS DEC #F GHI PS STR 00 LD IM
+              N: ( NICHT GEF. ) #E4 ( $P3 ) LD IM #A PLO
+                 #F LDA #C PLO #A STR #A INC #F LDA #A STR
+                 D=0 Y? #C GLO D=0 Y? PS DEC PS STR
+                                      PS DEC PS STR
+                                   TH
+                     TH
+              TH
+D=0 NOT Y? ( NOT AT END ) vert
+01 EF END 7 DEC 7 DEC TH      NEXT
+
+
+
+
+code $CSCAN  #DE ( $PI ) LD IM #E PLO #A GHI #E PHI #F ->X
+  #E LDA #F PLO #E LDA #F PHI #02 XOR IM D=0 NOT
+Y? LD MX #20 XOR IM D=0 Y? 01 LD IM
+                        N: LD MX #28 XOR IM ( KLAMMER AUF ? )
+                           D=0 Y? 01 LD IM #8 PHI ( C-FLAG )
+                               N: #8 GHI SHR ( C-FLAG )
+                                  DF Y? LD MX #29 XOR IM
+                                        D=0 Y? #8 PHI
+                                            TH 01 LD IM
+                                     N: 02 LD IM
+TH                      TH     TH    TH  #C PLO
+D=0 Y? #E2 ( $P2 ) LD IM #A PLO
+       01 LD IM #A STR #A INC SHR #A STR
+    TH
+PS INC PS ->X #C GLO XOR MX
+              D=0 Y?  #F INC #E DEC #F GHI #E STR
+                             #E DEC #F GLO #E STR
+                      PS DEC 7 DEC 7 DEC
+                  N:  #C GLO PS STR 00 LD IM PS DEC PS STR
+                  TH  NEXT
+
+:n $SUCH LINK @ $P3 ! $SCODE ;n
+
+
+:n $NAME   0   READYFLAG @B  ( $P2: AUXILIARY END FLAG )
+       ja? 1 $CSCAN >0
+          ja? $PI @ $P1 !
+              2 $CSCAN PWEG #CE57 #8D
+              $P1 @ $PI @ ZWO - DUP 63 > ja? WEG 63
+                                         dann
+              DUP $ND !B 1 - ZWO +
+              je I @B $POLYNAME
+              nun $ND 3 + !B $ND 1 + ! 1
+          dann
+       dann ;n
+
+
+
+
+:n $ZAHL 1 ( OK ) 0 ( ANF. ) $PI @ 1 - $P1 @
+  #2D ZWO @B = ja?    1 +  -1 S>R ( NEG ) 10 ( BASIS )
+               nein:        1 S>R ( POS )
+                    #23 ZWO @B =
+                    ja?   1 +             16
+                    nein: #42 ZWO @B =
+                          ja?    1 +       2
+                          nein:           10
+               dann dann  dann   BASIS !
+ VERT je BASIS @ * I @B DUP #3A < ja? #30 -
+                                  dann
+                        DUP #40 > ja? #37 -
+                                  dann
+         DUP BASIS @ >= ZWO <0 ODER ja? ( ERROR ) WEG 0 RDU
+                                    dann +
+      nun R>S * VERT ;n
+
+(    ***temporary re-assignment for larger $CBU***    )
+( ***needs to be cleaned up in initial allocations*** )
+hier dup ?n $CBU !n  #200 +n $h !n 
+
+:n 1L/DECODE  0 0 0  0 68 je $RBU I + I + @ W/DECODE $CBU I + !B
+                         nun PWEG WEG
+             $CBU 3 + $CBU 66 >>> ;n
+
+:n 3L/DECODE  0 0 0  0 196 je $RBU I + I + @ W/DECODE $CBU I + !B
+                         nun PWEG WEG
+             $CBU 3 + $CBU 194 >>> ;n
+
+:n CLEAR$RBU #20 $RBU !B  $RBU DUP 1 + 511 L>>> ;n
+
+<X  #0000 var fwd1  #0000 var fwd2  X> ( Compiler forward refs )
+
+:n COMPILER  $NAME
+ja? $SUCH
+    1   ( FOR CONTINUING ) BEM @B  ( ? limited input )
+        ja? ZWO 'n RUMPELSTILZCHEN
+                = ja?   ( RUMP. ) 0 BEM !
+                  nein: ( NOT RUMP. ) Z-LESEN @
+                       ja?   PWEG 0 1
+                       nein: ZWO BEA @ <
+                             ja? IE WEG 0
+                             dann
+                       dann
+                  dann
+        dann ( end limited input mode checks )
+   ja?  ( CONTINUE FLAG ? )  DUP =0
+        ja? ( NUMBER PROCESSOR )
+         WEG $ZAHL
+          ja?  COMPILEFLAG @B
+            ja? DUP #FF00 UND
+             =0 ja? 'n 1BLITERAL $DEP
+                      HIER !B $H INCR
+                nein: 'n 2BLITERAL $DEP $DEP
+                dann
+            nein: BEM @B ja? EINGABEZAHL ! 0 Z-LESEN !
+                         dann
+            dann
+          nein: IE
+          dann
+      nein: ( FOUND PROCESSOR ) DUP 6 - @B #C0 UND
+            COMPILEFLAG @B ODER
+            DUP 1 =
+            ja?   WEG HIER $ML >= ja?   0 COMPILEFLAG !B WEG
+                                        MEMMESSAGE SYSWRITE
+                                  nein: $DEP
+                                  dann
+            nein: DUP #80 = VERT #C1 = ODER
+                  ja?    IE
+                  nein: R>S $V1 ! $TUE $V1 @ S>R
+                  dann
+            dann
+      dann
+      $PSHOLEN $SL > ja? $SL $PSSETZEN STACKMESSAGE SYSWRITE
+                       WEG $F1
+                   dann
+   dann
+dann READYFLAG @B $P2 @B UND
+     ja?  CLEAR$RBU
+          ACKNMESSAGE SYSLINE 29 >>> ( IPS-ack )
+          BASIS @ ( save ) 16 BASIS !
+          SYSLINE 22 +  i> hier fwd1 !n h2inc <i  (SP) !
+                CMD# @  i> hier fwd2 !n h2inc <i  (WAND)
+                BASIS !  ( restore )                     $CEN
+     dann
+(SCHLUESSEL AND CODE TEST ) DATA-IN @B
+ja? 0 DATA-IN !B SCHLUESSEL
+    $RBU $RBE 1 + je I @B CYC2
+                  nun
+    =0 DUP NICHT 
+       ja? WEG 1L/DECODE SCHLUESSEL ( ? 1-line FEC )
+           $CBU DUP 65 + je I @B CYC2
+                           nun =0 DUP   
+           ja? CLEAR$RBU $CBU $RBU 64 >>>
+           dann 
+       dann
+       DUP NICHT
+       ja? WEG 3L/DECODE SCHLUESSEL ( ? 3-line FEC )
+           $CBU DUP 193 + je I @B CYC2
+                          nun =0 DUP
+           ja? CLEAR$RBU $CBU $RBU 192 >>>
+           dann 
+       dann                 
+       ja? ( OK ) 1 READYFLAG !B
+            0 $P2 !  CMD# INCR         #2020 (    )
+            nein: ( FEHLER ) 1 ECHO !  #454B ( KE )
+            dann $RBE !
+dann ;n
+
+( END, PART B )
+
+
+( IPS-D2, PART C AND D: AUXILIARY ROUTINES )
+:n ENTRYSETUP $F1 $KK ! $NAME DUP
+       ja?   $SUCH =0 NICHT $RS @ UND
+             ja?   RSMESSAGE SYSWRITE WEG  0
+             nein: HIER DUP $KK ! LINK @ H2INC H2INC
+                   $DEP $ND ZWO 4 >>> LINK ! HIER VERT H2INC
+             dann
+       nein: NAMEMESSAGE SYSWRITE
+       dann ;n
+
+:n $GETADR $NAME ja?   $SUCH DUP =0
+                             ja?   IE      0
+                             nein:         1
+                             dann
+                nein: NAMEMESSAGE SYSWRITE 0
+                dann ;n
+:hpri  '     $GETADR ja? COMPILEFLAG @
+                        ja? 'n 2BLITERAL $DEP $DEP
+                        dann
+                    dann ;n
+
+:prior  ;     'n RETEX $DEP  0 COMPILEFLAG !B
+         $F2 <>
+         ja? STRUCMESSAGE SYSLINE #20 + 16 >>>
+             LINK @ DUP $H ! 4 + @ LINK !      0 IE
+         dann ;n
+
+:int  :   ENTRYSETUP ja? DEFEX VERT ! 1 COMPILEFLAG !B $F2
+                    dann ;n
+:n PRIMODIFY   $KK @ @B ODER $KK @ !B ;n
+
+:int :PRIOR  i> 'n  : $dep <i      #80 PRIMODIFY ;n
+:int :HPRI   i> 'n  : $dep <i      #40 PRIMODIFY ;n
+:int :INT    i> 'n  : $dep <i      #C0 PRIMODIFY ;n
+
+:prior JA? 'n BRONZ $DEP HIER H2INC ;n
+:prior DANN  HIER VERT ! ;n
+:prior NEIN: 'n JUMP $DEP HIER H2INC VERT i> 'n DANN $dep <i ;n
+:prior JE    'n $JEEX $DEP HIER H2INC ;n
+:prior NUN   'n LOOPEX  $DEP DUP i> 'n DANN $dep <i 2 + $DEP ;n
+:prior +NUN  'n +LOOPEX $DEP DUP i> 'n DANN $dep <i 2 + $DEP ;n
+:prior ANFANG HIER ;n
+:prior ENDE? 'n BRONZ $DEP $DEP ;n
+:prior DANN/NOCHMAL VERT 'n JUMP $DEP $DEP i> 'n DANN $dep <i ;n
+ :int KON        ENTRYSETUP ja? CONSEX VERT ! $DEP
+                           dann ;n
+:int VAR        ENTRYSETUP ja? VAREX  VERT ! $DEP
+                           dann ;n
+:int FELD       ENTRYSETUP ja? VAREX  VERT ! HIER + $H !
+                           dann ;n
+'n $EBU 02 +n $OC @n var SP
+:n !CHAR   SP @ !B SP INCR ;n
+
+:n TLITERAL I 1 + R>S @B PDUP + S>R SP @ PDUP + SP !
+           VERT L>>> ;n
+:hpri " $PI INCR $PI @
+        anfang $PI @ DUP @B #22 = VERT $RBE > ODER $PI INCR
+        ende?
+        $PI @ 2 - ZWO - DUP 1 < ZWO 256 > ODER
+        ja?   TEXTMESSAGE  SYSWRITE VERT WEG
+        nein: COMPILEFLAG @ ja? S>R I 'n TLITERAL $DEP HIER !B
+                                $H INCR HIER I L>>>
+                                HIER R>S + $H !
+                            dann
+        dann ;n
+
+:int !T VERT L>>> ;n
+                                   ( END PART C )
+
+( IPS-D2, PART D )
+:n LEERZ S>R SP @ #20 ZWO !B DUP 1 + R>S 1 - L>>> ;n
+
+:n !FK   S>R I 2 * + 1 R>S je 2 - DUP S>R ! R>S
+                        nun WEG ;n
+:n !W    #F UND DUP + #43E + ! 1 #43F !B ;n
+
+:n WAND BASIS @ 10 = ja?   DUP ( ZAHL ) <0
+                          ja? CHS #2D ( - ) !CHAR
+                          dann 10000 0 ( W. AT BEGINNING )
+                    nein: 16 BASIS ! #23 ( # ) !CHAR
+                          #1000 1 ( W. AT BEGINNING )
+                    dann  S>R
+   anfang VERT ZWO /MOD VERT
+            I NICHT ja?  DUP >0 ja? R>S WEG 1 S>R
+                    dann        dann
+                  I ja?  DUP  #30 + DUP #39 >
+                                    ja? 7 +
+                                    dann !CHAR
+                    dann
+                    WEG VERT BASIS @ / DUP =0
+   ende? PWEG R>S NICHT ja? #30 !CHAR
+                        dann ;n
+
+( STACK DISPLAY )
+:n ZEIG-STAPEL          SP @ S>R  $RBU SP ! #80 LEERZ
+  $PSHOLEN $SL ZWO - DUP 32 > ja? WEG 32
+                              dann   S>R I +
+  anfang I >0
+  ja?  DUP I - DUP  1 + @B VERT @B 256 * + R>S 2 - S>R
+       $RBU I 4 * + SP ! WAND
+  dann/nochmal
+  R>S  PWEG R>S SP ! ;n
+
+
+:n $INSERT   VERT #7 UND   2 * KETTE + ! ;n
+
+:n $CHAINACT COMPILEFLAG @
+            ja?   'n 2BLITERAL $DEP $DEP
+                  'n $INSERT   $DEP
+            nein: ZWO #FFF8 UND ( MASK FUER 0-7 )
+                  =0 ja?   $INSERT
+                     nein: IE
+                     dann
+            dann ;n
+:hpri AUSH  'n RUMPELSTILZCHEN $CHAINACT ;n
+:hpri EINH  $GETADR ja? $CHAINACT
+                    dann ;n
+:int ?   $GETADR ja? 2 +
+                 dann ;n
+
+:n SCHREIB   S>R SP @ I L>>> SP @ R>S + SP ! ;n
+
+:int WEG/AB  $GETADR  ja? DUP $LL <
+                          ja?   IE
+                          nein: 2 - DUP @ LINK ! 4 - $H !
+                          dann
+                      dann ;n
+
+'n RUMPELSTILZCHEN kon A-COMPOSER
+
+:n EB-HANDLER  T/Z @B =0     ( IN 0 EINGEH )
+      ja? ECHO @B
+          ja?   $P2 @ ja? ZEIG-STAPEL 0 $P2 !
+                      dann
+                $RBU TRANSPORT ETRANSMIT DIN-ENABLE 0 ECHO !
+          nein: READYFLAG @ =0 ( WEDER DATA-IN NOCH READYFLAG )
+                ja? A-COMPOSER $TUE
+                dann
+          dann
+      dann ;n
+
+'n SP    fwd1 @n  !O  ( Plant two COMPILER fwd refs )
+'n WAND  fwd2  @n !O
+
+hier 'n $LL 02 +n !O             ( END IPS-D2 )
+
+
+
+( BUILD REMAINDER OF SYSPAGE )
+'n COMPILER 'n EB-HANDLER 'n RUMPELSTILZCHEN dup dup dup dup
+dup dup dup 'n JUMP #04C0    #04C0 $OC 12 !fk
+hier #04E6 !O
+$ccodes 22 +n @n 'n LINK #2 +n !O
+
+           ( END OF METACOMPILATION )
+
+<X                  ( CRCC UTILITIES )
+:n crcc  #FFFF  rdu je i @b cyc2 nun ;n            (block crcc)
+:n CRCC je i i dup #1FF +n crcc vert        (crcc',addr on stk)
+     #4200 -n  #100 /n #4180 +n !n     (poke crcc' into loader)
+    #200 +nun ;n
+
+     ( NOW COMPUTE CRCCs AND PLANT THEM INTO THE LOADER )
+X> hier <X          dup                 ( Get the end of IPS-D)
+#200 /n #1 +n #2 *n #40FC !b            (       Plant end addr)
+#3E00 +n dup                            ( End of IPS, physical)
+#4200 vert CRCC                         ( Do CRCCs on IPS part)
+#4000 #41FB  crcc #41FC !n              (  CRCC on loader part)
+#4000 vert  ~ IPS-D2.BIN ~ $save        (    Save "IPS-D2.BIN")
+
+               ( End of IPS-D2 compilation)
+
+
+
+~    IPS-D2 compiled OK      ~ #01D3 !t  ( Information splash )
