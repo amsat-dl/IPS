@@ -1,0 +1,408 @@
+!IPS-X.Docs.Info                                                   1997 Jul 19
+
+     
+                         IPS-X   Cross-Compiler
+                         ----------------------
+ 
+                     (C) 1997 James Miller G3RUH
+
+This is a copy of IPS Cross Compiler v2.04 for Acorn Risc Computers.
+Please read the whole of this file before you get hacking.
+
+A good understanding of IPS is assumed, and you are strongly advised to
+read the companion instructions supplied with normal IPS-M.
+
+
+To Run
+------
+Double-click on the white-ish icon  !IPS-X
+
+To Use
+------
+Input, output and operation is as described in the book "IPS - High Level
+Programming of Small Systems" by Karl Meinzer (1978), ISBN 0-9530507-0-X.
+There are minor differences:
+
+ - Standard words are in German, (lower case).
+ - At errors, the offending word is displayed in inverse video and the cursor
+   placed at the start of the word.
+ - The cursor control keys may also be used.  
+
+OUTPUT: Is virtually identical to IPS-N for the Atari 800XL etc
+
+INPUT:  1. You enter commands by typing them in the usual way.
+
+        2. Or you can read a file.  For example, enter:
+
+          ~ ips-m/src ~ read   <ret>
+      
+Note that the default directory is called "Work" and is inside the
+application.  Keep your hacks in there.
+
+Quitting
+--------
+Hit ESCAPE.
+
+If you hold down SHIFT at the same time, a screendump is placed in RAM disc.
+
+______________________________________________________________________________
+
+Source files
+------------
+Source files are located in the directory  !IPS-X.Work .  Presently they are:
+
+   File           Description                                  Author
+   ------------------------------------------------------------------------ 
+   IPS-M/SRC      IPS-M for the Acorn Risc Computer             jrm
+    
+   1802/ASM       1802 assembler                                km
+    
+   LADER-C3/S     AO-13 flight computer self-checking loader    pg
+     
+   IPS-C3/SRC     AO-13 flight software.                        km/pg/jrm
+   ------------------------------------------------------------------------
+
+You may add to this list if you wish ...
+
+The directory also includes some utility (batch) files as discussed in
+these notes.
+
+"Work" is the default directory for compilation output. 
+
+____________________________________________________________________________
+
+                   About the IPS-X Cross Compiler
+                   ------------------------------
+The cross compiler is the same as normal IPS-M except that:
+
+  a. All normal IPS words are in lower case, and letter-less words have an
+     "n" appended.  The string delimiter is ~ .  Examples:
+     
+        hier  $h weg  kon  dup  !b  je  ja?
+        :n  ;n  !n  'n  <n  =0n
+        ~ SOME TEXT ~
+  
+  b. Facilities for cross-compiling have been added.
+
+  c. The chain consists of the compiler and display handler only.
+     Thus  einh and  aush  have been omitted.
+
+At start up, you may use IPS exactly as normal, subject to the word
+translation as above.
+
+
+1. How it works
+   ------------
+All versions of IPS include a powerful compiler, so it is natural to use
+this power to take IPS source files for an alien machine and cross assemble
+them to a target image.
+
+Thus in Cross-Compile Mode, commands in IPS are used for directives and
+expressions.  In this way, the alien source files may be written in a
+quasi-IPS style, interpreted by the cross-compiler and deposited in the
+target image as a binary for direct loading to the target machine.
+
+The target memory area is specified by the variable $O, and is #4000 by
+default.  This value is chosen to be memorable, and it is well clear of
+IPS' own workspace.  You can change it if you wish.
+
+The system is in Cross-Compile mode whenever $O is non-zero, and in
+Normal mode when $O = 0.
+
+The value returned by  hier  is the LOGICAL address associated with the
+current mode.  Thus when in X-compile mode you may write a directive such
+as #200 $h !n .  This will make the target build continue at logical
+address #200.  But the X-compiler maps this to PHYSICAL address #4200. 
+
+
+2. Control
+   -------
+Three commands are provided to switch Modes.  They are of type :int and so
+may not be used inside definitions.
+
+ X>   "X go".    Enter X (cross-compile) mode, toggling all pointers
+ 
+ <X   "From X".  Exit  X mode, toggling all pointers
+
+ X>>  "X start". Enter X mode, initialising all pointers.
+
+
+X> and <X are complementary, and you may use them freely to swap modes
+without affecting either the normal IPS build or the target build as
+appropriate.  If you are already in X mode, the command X> will be ignored
+(inverse echo).  Likewise, from normal mode  <X is meaningless.
+
+X>> is used to start up cross compilation mode from scratch, and would
+normally be included at the start of the first alien source file.
+
+The sequence  X>>  <X is equivalent to a soft reset; pointers are
+initialised, but the target area is not wiped, and any new normal words are
+retained.
+
+
+3. Utilities
+   ---------
+These words are provided for you to include in alien source files.
+
+$OC   Converts a logical address to physical address.
+       <addr> $OC
+       <addr + value of $O> 
+
+!O    Store a word in image workspace.
+       <n> <addr> !O           n stored at (addr + value of $O)
+       <empty>
+
+
+4. Using the Cross-Compiler
+   ------------------------
+This is best explained by examples.
+
+4.1. Compiling IPS-M
+     ---------------
+IPS-M for Acorn Risc Computers needs an assembler, though only the four
+words    i>  <i  ,  rcode .  These are simply affixed to the start of the
+source file, which may then be compiled in one operation:
+
+  ~ IPS-M/SRC ~ read
+  
+The output is a binary called M-bin, and is placed in the !IPS-X.Work.  It's
+suggested you study IPS-M/SRC to understand the basic compiler directives.
+
+If you want to repeat the above, first do    weg/ab i>    to delete the
+so-called "assembler", which is the first definition in the source file.
+
+
+4.2. Compiling IPS-C3 for AO-13's IHU
+     --------------------------------
+In the Work directory are three source files which re-create the AO-13
+flight IPS-C3;  1802/ASM, LADER-C3/S and IPS-C3/SRC.
+
+Step 1. Load the 1802 assembler;  enter:
+
+          ~ 1802/ASM   ~ read 
+
+Step 2. Cross-compile the first source file; enter:
+
+          ~ LADER-C3/S ~ read
+
+Step 2. Now enter:
+
+          ~ IPS-C3/SRC ~ read
+
+That's all!  You will find that in the work directory there is now a new
+file called IPS-C3 which is ready to be loaded straight into your AO-13
+IHU.  Just double-click on it, and away you go.
+
+Explanation of the above Steps
+------------------------------
+First recall that the final image IPS-C3 is composed of two parts.  The
+self-checking loader at #0-#200 exclusive, and the flight IPS image, logical
+address #400-#1DA1 which is planted at #200-#1BA1 for upload, i.e. displaced
+#200 bytes downwards. 
+
+
+Step 1. IPS-X is a general purpose cross-compiler.  As it is about to
+        work for a CDP-1802 target, it first needs the assembler to be loaded.
+
+Step 2. Load the source file LADER-C3/S (in the work directory) into
+        a text editor.  The first and last lines are similar to:
+    
+        X>>          ( Set cross compile mode, with reset)
+        
+        #0000 $h !n                          (Set to compile at address 0)
+        #2020 #4000 !n #4000 #4001 511 l>>>  (Fill with #20s)
+        
+        NOP #0 DEC NOP 9 LD IM 1 PLO ...     (Assembly code)
+         :
+         :    (lots more code here)
+         :
+        #0 $OC hier $OC ~ LADER-C3 ~ $save     (Save the image)
+       
+        <X  ( Return to Normal mode )
+        
+
+Step 3. Study the source IPS-C3/SRC.  It begins and ends with:
+        
+        X>>  #3E00 $O !n   ( Set X-compile mode; move target )
+                           ( zone down #200 bytes.            )
+        (IPS-C3, SATELLITENVERSION, BAU DER SYSSEITE 26.6.86 )
+        #0400 $h !n
+         :
+         :
+         :
+        #200 $OC hier $OC  ~ IPS-C3 ~ $save
+        <X
+
+        The device of temporarily setting $O to #200 lower than #4000
+        means that the loader code previously compiled now appears to be
+        in the logical space #200-#3FF, immediately before the IPS-C3
+        compilation which begins at #0400.
+
+        You can change $O like this because the loader part contains no
+        IPS definitions, only assembly code.
+
+        The save command above is equivalent to #4000 #5BC1 $save.  Both
+        the Loader and IPS-C3 are saved as one entity
+
+Command files/scripts
+---------------------
+As an alternative, requiring an extra step, it is perfectly feasible to
+compile LADER-C3/S to #4000 and save its binary as LADER-C3; then
+compile the IPS-C3/SRC part also to #4000 and save its binary as IPS-C3;
+and then do a merging operation with:
+
+  #0 #4000 !n #4000 #4001 #1FFF l>>> ( Clear #2000 bytes memory )
+  
+  #4000       ~ IPS-C3   ~ $load ( IPS-C3.  Now overlay the )
+  #4000       ~ LADER-C3 ~ $load ( self checking loader     )
+  #4000 #5C00 ~ IPS-C3   ~ $save ( Loader + IPS-C3 )
+
+But that's a lot of typing.  Much the best way to do project management is
+to keep long winded invocations like this in command files.  The above is
+in a file called "merge".  So after compiling, enter:
+
+  ~ merge ~ read 
+                               --+--
+
+The command file "merge/crc" is even more powerful.
+
+It will load LADER-C3 and IPS-C3 into memory, and then compute the 14 CRCC
+checks and re-plant them into LADER-C3.  The output image is called IPS-C4.
+
+This script allows you to tinker with IPS-C3/SRC, and end up with an IHU
+loadable image with all the CRCs correct.  Just enter:
+
+   ~ merge/crc ~ read
+
+
+5. For Advanced Users
+   ------------------
+If you find it tedious to keep loading 1802/ASM before compiling a source
+file, here are two alternatives:
+
+   1. You can prefix your source material with the assembler definitions.
+   
+   2. Alternatively you can easily build a specifically 1802 cross-assembler
+      (like the old IPS-X1802), as follows:
+   
+   Edit the !IPS-X.!Run file so that the start-up binary file
+   is   Work.X1802-bin  (rather than the standard X-bin).  Now this is
+   already in the !Run file, and merely needs the out-comment "|" to
+   be moved up a line.
+   
+
+   Note that the file X1802-bin was previously created (by me) thus:
+     1. Run IPS-X
+     2. Load the 1802 assembler by entering:  ~ 1802/ASM ~ read
+     3. Save out the IPS memory:    #0 hier ~ X1802-bin ~ $save        
+      
+
+6. Cautions/Tips
+   -------------
+1. Note that a command file can only invoke ONE other command file, and that
+   MUST be the LAST item in the file.  This is because the invoked file will
+   overwrite the calling file that's presently in the input buffer.
+
+2. IPS can only search for words in the target area when in X-compile mode.
+
+3. ?n <name>  returns the physical address of name's parameter field,
+              subject to 2 above.
+
+4. weg/ab <name> may be used conventionally, subject to 2 above.
+                 Fortunately, if you delete a normal definition you won't
+                 delete any following target material ...
+
+5. Do not place a :n definition at logical address #0, otherwise it
+   cannot be found during a name search.  To obviate that, a X-compile mode
+   default value of $h = 2 is used.  You are unlikely to want to put a
+   definition at #0, as that page is usually used for system purposes,
+   not IPS definitions.
+   
+6. Don't try to execute words belonging to the target image!  They are
+   meaningless commands to the host IPS, so you will probably crash the
+   system.  A common error is to type WEG (which is probably a target
+   definition) when you meant "weg".  To avoid this sort of finger trouble,
+   always use <X to return to normal mode before you start messing about.
+   Invocations of target words will then be ignored.
+
+   Another slip is to type 0 1 2 4 when still in X-compile mode.  0 1 2 4 are
+   defined as kon under IPS-C3, so if you are still in X-compile mode and you
+   use (say) 0, you will crash the system.  Use #0 or 00 etc instead.
+
+
+                               Appendix
+                               --------
+
+X-Compiler Extensions
+---------------------
+    0 var $O               (Compile zone address)
+
+:n $OC    O$  @n  +n  ;n   (Logical to physical conversion)
+
+:n !O     $OC !n  ;n       (Store word at an offset address)
+
+    0 var $nh              (Temp $h from normal mode)
+    2 var $Oh              (Temp $h from offset mode)
+#4000 var $Ot              (Temp store for $O)    
+#4000 kon $OZ              (Default offset zone)
+
+:int X>              ( Enter Xcompile mode; toggle pointers )
+  $O @n =0n  ja?           (Can't do unless in Normal mode )
+    hier  $nh !n           (Preserve normal $h)
+    $Oh @n $h !n           (Restore offset's $h)
+    $Ot @n $O !n           (Restore offset zone)
+  nein: 0 ie               (Else complain)
+  dann ;n 
+
+:int <X              ( Exit X-compile mode; toggle pointers )
+  $O @n <>0n  ja?         (Can't do unless in X mode )
+    hier  $Oh !n          (Preserve offset $h)
+    $nh @n $h !n          (Restore normal $h)
+    $O @n $Ot !n          (Preserve current O$)
+    #0     $O !n          (No offset)
+  nein: 0 ie              (Else complain)
+  dann ;n 
+
+:int X>>             ( Enter X mode, initialising pointers )
+ $O @n =0n ja? hier $nh !n dann    (Preserve normal $h)
+                  #2 $h !n         (Sensible init offset $h)
+       #0 $ccodes 22 +n !n         (Init O-link)
+                 $OZ $O !n ;n      ($O = default offset)
+
+24 feld $ccodes           (Directive translation table)
+
+Directive Translations
+----------------------
+The ability to use words :n  var kon   42  ja? je nun +nun ;n   as
+convenient directives in an alien source file is very useful.  But it does
+also mean that a translation table is needed so that in Cross-compile mode
+target words are used rather than host words.
+
+For example, in Normal mode,   #1234  would compile to  [2bliteral] [#1234]
+whereas in X-compile mode it must compile to [2BLITERAL] [#1234] where the
+uppercase word is already defined for the target.
+
+To this end, a translation table is maintained in the 12 word field $ccodes.
+The addresses carried in it are:
+
+  $ccodes    Target word
+   offset      address
+ ----------------------------
+      0        DEFEX        )
+      2        VAREX        )
+      4        CONSEX       )
+      6        2BLITERAL    )
+      8        1BLITERAL    )    These addresses have
+     10        BRONZ        )    to be planted by !n  
+     12        JUMP         )    directives in the   
+     14        $JEEX        )    target source file  
+     16        LOOPEX       )
+     18        +LOOPEX      ) 
+     20        RETEX        ) 
+     22        - see below      
+ ----------------------------
+
+ $ccodes+22 is used as the name link list pointer for the target during
+ X-compilation, instead of the normal   link .
+
+<end>

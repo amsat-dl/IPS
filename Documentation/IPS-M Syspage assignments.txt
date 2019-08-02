@@ -1,0 +1,107 @@
+       IPS-M Syspage assignments
+       -------------------------
+
+ Syspage assignments 400-47F
+ ---------------------------
+  400  ' COMPILER               420
+  401                           421
+  402  0 ' ZEIG-STAPEL (KETTE)  422  SU1
+  403                           423
+  404  1                        424
+  405                           425
+  406  2                        426  SU2
+  407                           427
+  408  3                        428
+  409                           429
+  40A  4                        42A  SU3
+  40B                           42B
+  40C  5                        42C
+  40D                           42D
+  40E  6                        42E  READYFLAG
+  40F                           42F  $PE value
+  410  7                        430
+  411                           431  $PI value
+  412  JUMP                     432
+  413                           433  $P1 value
+  414  #0400                    434
+  415                           435  $P2 value
+  416  -                        436
+  417  -                        437  $P3 value
+  418  UHR                      438
+  419                           439  $H  value
+  41A                           43A
+  41B                           43B  LOADFLAG
+  41C                           43C   reserved for IPS-X
+  41D                           43D   reserved for IPS-X
+  41E  SU0                      43E  ) ' $ND + 2
+  41F                           43F  )
+
+ Syspage assignments 480-4FF
+ ---------------------------
+ Nearly all of this is for return stack; more than enough, although (e.g.)
+ 6 12 18 TAK  will use from #4F8  down to #4B2.
+
+ 480 Return stack max 60 items          4C0
+ 481       ^                            4C1
+ 482       ^                            4C2
+ 483                                    4C3
+ 484                                    4C4
+ 485                                    4C5
+ 486                                    4C6
+ 487                                    4C7
+ 488                                    4C8
+ 489                                    4C9
+ 48A                                    4CA
+ 48B                                    4CB
+ 48C                                    4CC
+ 48D                                    4CD
+ 48E                                    4CE
+ 48F                                    4CF
+ 490                                    4D0
+ 491                                    4D1
+ 492                                    4D2
+ 493                                    4D3
+ 494                                    4D4
+ 495                                    4D5
+ 496                                    4D6
+ 497                                    4D7
+ 498                                    4D8
+ 499                                    4D9
+ 49A                                    4DA
+ 49B                                    4DB
+ 49C                                    4DC
+ 49D                                    4DD
+ 49E                                    4DE
+ 49F                                    4DF
+ 4A0                                    4E0
+ 4A1                                    4E1
+ 4A2                                    4E2
+ 4A3                                    4E3
+ 4A4                                    4E4
+ 4A5                                    4E5
+ 4A6                                    4E6
+ 4A7                                    4E7
+ 4A8                                    4E8
+ 4A9                                    4E9
+ 4AA                                    4EA
+ 4AB                                    4EB
+ 4AC                                    4EC
+ 4AD                                    4ED
+ 4AE                                    4EE
+ 4AF                                    4EF
+ 4B0                                    4F0
+ 4B1                                    4F1
+ 4B2.                                   4F2
+ 4B3                                    4F3
+ 4B4                                    4F4
+ 4B5                                    4F5
+ 4B6                                    4F6        ^
+ 4B7                                    4F7        ^
+ 4B8                                    4F8   IPS Return Stack base
+ 4B9                                    4F9   (Stack underflow)
+ 4BA                                    4FA        v
+ 4BB                                    4FB        v
+ 4BC                                    4FC        v
+ 4BD                                    4FD        v
+ 4BE                                    4FE        v
+ 4BF                                    4FF   (Underflow max 4 items)

@@ -1,0 +1,306 @@
+!IPS-M.Docs.Info                                                  1998 Jan 15
+
+                                                   
+                    IPS-M for Acorn Risc Computers
+                    ------------------------------
+
+                     (C) 1996-8 James Miller G3RUH
+
+This is IPS-M  v2.05 for Acorn Risc Computers.  Please read the whole of this
+file before you get hacking.
+
+To Run
+------
+Double-click on the blue-ish icon  !IPS-M
+
+To Use
+------
+Input, output and operation is as described in the book "IPS - High Level
+Programming of Small Systems" by Karl Meinzer (1978), ISBN 0-9530507-0-X.
+There are minor differences:
+
+ - Standard words are in German.  
+ - At errors, the offending word is displayed in inverse video and the cursor
+   placed at the start of the word.
+ - The cursor control keys may also be used.  
+
+OUTPUT: Is virtually identical to IPS-N for the Atari 800XL etc
+
+INPUT:  1. You enter commands by typing them in the usual way.
+
+        2. Or you can read a file.  For example, enter:
+
+          " TRIG " READ   <ret>
+      
+Note that the default directory is called "Work" and is inside the
+application.  Keep your hacks in there.
+
+Quitting
+--------
+Hit ESCAPE.
+
+If you hold down SHIFT at the same time, a screendump is placed in RAM disc.
+ 
+_____________________________________________________________________________
+
+IPS-M Design
+------------
+A listing of the IPS-M source is supplied in   Docs.Listing .
+
+The M-9097 Meinzer Computer has 64K of memory, used as follows:
+
+  Screen Buffer:    #000 -  #3FF
+  Syspage:          #400 -  #4FF
+  IPS:              #500 - #14FA
+  User:            #14FB - #xxxx
+  Parameter stack: #xxxx - #FFF8
+  Return stack:     #440 -  #4F8
+  
+Code routines are in an imaginary 8K ROM.
+
+The stacks are "Full-Descending" type with the LS byte at the lower address.
+
+The Generic IPS Specification Draft C is implemented (as per the paper copy),
+with the exception of assembler-oriented utilities:
+           RCODE  CODE  NEXT  ERZ>  MACHT> MACHT/CODE>  I>  <I
+
+There are 8 chain positions, numbered 0 - 7, accessed with EINH and AUSH.
+The stack display routine is allocated to chain position 0.
+The time is at UHR, and the four stopwatches are included SU0 - SU3 .
+
+
+Additional words: (IPS Spec. Draft E) familiar from IPS-C:
+----------------
+P/      is like P/MOD but returns the quotient only.  See IPS Spec.
+
+CHS     changes the sign of the item on the stack
+
+        <n>  CHS
+        <-n>
+
+CYC2    takes 16-bit seed and a byte and returns the crcc'd value.
+        Typically used in a loop, e.g   #FFFF 0 511 JE I @B CYC2 NUN 
+
+        <seed>  <byte> CYC2
+        <new seed>
+        
+P+      double-length addition.  Adds two 32-bit numbers and returns result
+        on the stack
+
+        <ls word A>   <ms word A>   <ls word B>   <ms word B>  P+
+        <ls word A+B> <ms word A+B>
+        
+P-      double-length subtraction; similar to P+
+
+        <ls word A>   <ms word A>   <ls word B>   <ms word B>  P-
+        <ls word A-B> <ms word A-B>
+
+
+New words:  CLS  LANG  READ  $SAVE  $LOAD  OSCLI  S-ON  $TVS  DEFCHAR
+---------
+CLS     Clears the stack; Clear Screen.  This word cannot be used inside a
+        definition.   (Type is :INT)
+
+        CLS
+        empty
+        
+
+LANG    Sets language for error messages;  0 = German,  1 = English
+
+        < language > LANG
+        empty
+        
+
+READ    Executes a file.   This will read the file, compile definitions
+        therein and execute any commands.
+
+        < " FileName " >  READ
+        empty
+
+        Error conditions:
+          No filename.
+          File not found etc.
+          On error, 2 bytes are left on the stack.
+          
+        Example:
+        
+        " TRIG " READ               Loads and compiles trigonometry library  
+          
+        This word cannot be used inside a definition.
+
+
+$SAVE   Saves a block of memory to file.  Start address, limit address
+        ( = final address + 1 ) and a file name must be specified.
+        Saved block size is rounded up to a multiple of 512 bytes.
+        
+        This word cannot be used inside a definition.
+
+        <start_address>  <limit_address> < " FileName " >  $SAVE
+        empty
+
+        Examples:
+        
+        #400  #500  " Syspage "    $SAVE   write 512 bytes to a file named
+                                           "Syspage" in the current directory.
+                                           
+        #0 #FFFF    " ^.M-bin "    $SAVE   saves entire IPS memory to the
+                                           IPS-M application directory
+                                           overwriting the standard build.(*)
+                                          
+        Error conditions:
+          Block length specified zero or negative.
+          Bad filename; existing file locked or open, or is a directory etc.
+          On error, start and limit addresses are left on the stack.
+
+(*) Notes  
+So next time you run IPS-M, it will start up exactly as you saved it, new
+definitions, chain, time and screen included.  The stack will however be
+empty.
+
+For your safety, a spare copy of the original IPS image M-bin is retained in
+the Work directory!
+
+You might choose use another name to save "your" IPS.  For example with, #0
+#FFFF  " MyBuild " $SAVE .  This can be invoked after start-up by using the
+$LOAD command (see below).  Alternatively you can edit the application's !Run
+file to invoke  Work.MyBuild   rather than the specified  M-bin .
+
+You might not wish to save the screen, and you might not have any work beyond
+HIER.  So you could enter:  #400 HIER " MyBuild2 " $SAVE . Of course you MUST
+re-load this to #400 see below), and never invoke such a file from the !Run
+file, which always loads to the start of IPS memory (#0000).  
+          
+                 
+
+
+$LOAD   Loads a file to memory.  Load address and file name must be specified.
+        This word cannot be used inside a definition.
+
+        <load_address> < " FileName " >  $LOAD
+        empty
+
+        Example:
+
+        #2000  " ArrayData " $LOAD          Loads the file "ArrayData" to
+                                            memory address #2000 
+
+        #0     " ^.M-bin "   $LOAD          Re-start IPS
+        
+        #0     " MyBuild "   $LOAD          Re-start IPS using "your" build
+                                            ( see $SAVE notes )
+        #400   " MyBuild2 "  $LOAD          Re-start IPS without screen data
+                                            ( see $SAVE notes )
+
+
+        Error conditions:
+          File not an IPS binary image.
+          File too big; will overflow memory.  File is zero length.
+          File not found etc.
+          On error, load address is left on the stack.
+          
+
+OSCLI   Send a command to the Acorn Operating System.
+        (Note: "OSCLI" = Operating System Command Line Interpreter)
+        This word cannot be used inside a definition.
+
+        < " Command " > OSCLI
+        empty.
+
+        Examples:
+
+        " Cat "          OSCLI   Catalogue of files in current directory
+        " Info "         OSCLI   Detailed Catalogue   
+        " Del. tmp "     OSCLI   Delete the file "tmp" from current directory
+        " Type NewChar " OSCLI   List contents of the file "NewChar"
+        "   "            OSCLI   Clear the oscli screen
+
+        Error conditions:
+         Invalid command.  (Up to 2 words may be left on the stack).
+         
+
+S-ON    Stack display on.
+        You turn the stack display off with 0 AUSH .
+        
+$TVS    The stack display is positioned on-screen at the address given by
+        the constant $TVS .  To place the stack display elsewhere, for example
+        on the 6th line, enter:   #140   ? $TVS ! 
+        
+        
+DEFCHAR  Re-define a character font.   
+         This word cannot be used inside a definition.
+         
+         <n1> <n2> <n3> <n4> <n5> <n6> <n7> <n8>  <char>  DEFCHAR
+         
+         Each of the 128 displayable characters is defined in an 8x8 bit
+         grid.  You may change any character by respecifying these 8 bytes.
+         Characters 0-31 are unused.  char must be in the range 0-127.
+         
+         Example: Redefine character 17 to be triangle
+         
+           L      M
+           01234567    Hex
+           --------    ---
+           ##......    #03
+           ###.....    #07
+           ####....    #0F
+           ##.##...    #1B
+           ##..##..    #33
+           ##...##.    #63
+           ########    #FF
+           ........    #00
+
+           #03 #07 #0F #1B #33 #63 #FF #00   17  DEFCHAR
+           
+         Note the reversed order of the bits in a specification byte.
+           
+         You can display the entire character set with:
+            : DISPLAY   0 255 JE I I TV4 + !B NUN ;   DISPLAY
+            
+         Try this example:  " NewChar " READ
+
+
+         
+Trigonometry Words:      TR-LOOP   RP-LOOP   3V3
+------------------
+        Refer to the documentation file "Docs.Trig" for details of
+        trigonometry code routines and see the library file "Work.TRIG".
+ 
+_____________________________________________________________________________
+
+Program Notes
+-------------
+The M-9097 engine ( !RunImage ) is written in ARM machine code.  Via the
+emulator loop it supports the ~64 code routines referenced from M-bin.  It
+also services keyboard input, file i/o, 20ms clocks and screen display.
+
+Loop speeds:
+
+  Machine         Emulator      Chain
+  --------------------------------------------
+  A3010           4.49  us    146    us
+  RISCPC/SA       0.127 us      3.91 us
+  --------------------------------------------
+
+
+"Emulator" means the time taken to go round the emulator loop, excluding any
+code routines.  The emulator is presently 12 ARM code instructions, and a
+typical IPS code routine averages 7 instructions including the return. (e.g.
+WEG takes 2 instructions, RDU takes 13) 
+
+"Chain" means the time taken to idle through one complete chain, consisting
+of the Compiler, Stack Display, and 7x NOOPs.  It's approximately 40 IPS
+words if there is no processing to be done.
+_____________________________________________________________________________
+
+IPS Generic Specification
+-------------------------
+This was scanned by Bill Roth N7RYW from the original photocopy document, and
+is gratefully acknowledged.
+
+The ASCII was then corrected for scanning errors by JRM, then additions/
+updates made, mainly at the end.
+
+There is, as of 1997 Feb 08, some more to be included, since the original
+ASCII file has come to light. (Tnx Robin Gape).  A revision is pending.
+_____________________________________________________________________________
+<end>

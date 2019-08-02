@@ -1,0 +1,443 @@
+
+( IPS-M for  Acorn RISC Computer   1997 Jul 18   James Miller )
+( ----------------------------------------------------------- )
+
+( "Assembler" definitions for use by IPS-X )
+
+  :prior i>      0 compileflag !b ;n
+  :int   <i      1 compileflag !b ;n
+  :n ,            hier $OC  !b $h incr ;n
+  :int rcode entrysetup ja? !O dann ;n
+  :int code  entrysetup ja? hier vert !O
+                        dann ;n
+
+~ Compiling IPS-M      ~ #01D5 !t        ( Information splash )
+
+X>>                                      ( Enter compile mode )
+#0000 $h !n
+#0  hier !O  hier $OC dup 1 +n #3FFF l>>>       ( Wipe memory )
+                            ( Fill screen buffer  with spaces )
+#20 hier !O  hier $OC dup 1 +n  #3FF l>>>
+
+~ IPS-M ~    #01DB $OC !t                        ( Identifier )
+
+#041E $h !n                                    ( Stop watches )
+1 , 0 , 0 , 0 ,  1 , 0 , 0 , 0 ,
+1 , 0 , 0 , 0 ,  1 , 0 , 0 , 0 ,
+
+( DEFEX )  01                          ( Codes for x-compiler )
+( VAREX )  03
+( CONSEX ) 02  $ccodes  3 !fk
+
+#0500 $h !n                                   ( Code routines )
+
+( When the emulator checks @ HP it must always point to       )
+( "excecutable code".  In this implementation the pointer is  )
+( used as an index into a jump table in the ARM code of the   )
+( IPS engine   M9097:!RunImage.  This is done for simplicity. )
+(                                                             ) 
+( IPS is 16-bit oriented, whereas the ARM is 32-bit oriented. )
+( Thus the  addressing advantages described in the book       )
+( "IPS - High Level Programming of Small Systems" by Karl     )
+( Meinzer [1978], ISBN 0-9530507-0-X  end of page 65, are not )
+( otherwise easily or, more important, robustly realised.     )
+
+#00  rcode    RUMPELSTILZCHEN    #04  rcode    RETEX
+#05  rcode    @                  #06  rcode    @B
+#07  rcode    !                  #08  rcode    !B
+#09  rcode    1BLITERAL          #0A  rcode    2BLITERAL
+#0B  rcode    BRONZ              #0C  rcode    JUMP
+#0D  rcode    WEG                #0E  rcode    PWEG
+#0F  rcode    +                  #10  rcode    -
+#11  rcode    DUP                #12  rcode    PDUP
+#13  rcode    VERT               #14  rcode    ZWO
+#15  rcode    RDU                #16  rcode    RDO
+#17  rcode    I                  #18  rcode    S>R
+#19  rcode    R>S                #1A  rcode    =0
+#1B  rcode    >0                 #1C  rcode    <0
+#1D  rcode    >=U                #1E  rcode    F-VERGL
+#1F  rcode    NICHT              #20  rcode    UND
+#21  rcode    ODER               #22  rcode    EXO
+#23  rcode    BIT                #24  rcode    CBIT
+#25  rcode    SBIT               #26  rcode    TBIT
+#27  rcode    $JEEX              #28  rcode    LOOPEX
+#29  rcode    +LOOPEX            #2A  rcode    >>>
+#2B  rcode    P*                 #2C  rcode    P/MOD
+#2D  rcode    $TUE               #2E  rcode    $POLYNAME
+#2F  rcode    $SCODE             #30  rcode    $CSCAN
+#31  rcode    CHS                #32  rcode    CYC2
+#33  rcode    $CLOSEFILE         #34  rcode    $OPENFILE
+#35  rcode    $OSCLICODE         #36  rcode    $LOADCODE
+#37  rcode    $SAVECODE          #38  rcode    $IPSETZEN
+#39  rcode    $PSHOLEN           #3A  rcode    $PSSETZEN
+#3B  rcode    RP-LOOP            #3C  rcode    TR-LOOP
+#3D  rcode    3V3                #3E  rcode    $DEFCHARCODE
+
+             ( End code routines for IPS-M )
+
+( IPS-M  Acorn Risc Computer Version 2.04  1997 Jul 18  by JRM )
+
+#0418  kon  UHR
+#041E  kon  SU0
+#0422  kon  SU1
+#0426  kon  SU2
+#042A  kon  SU3
+#0402  kon  KETTE
+0 kon 0   1 kon 1   2 kon 2   4 kon 4
+'n 2BLITERAL 'n 1BLITERAL 'n BRONZ 'n JUMP 'n $JEEX  'n LOOPEX
+'n +LOOPEX   'n RETEX  $ccodes 6 +n 8 !fk
+
+( IPS general definitions )
+:n >    - >0   ;n                :n <>    - =0 NICHT      ;n
+:n =    - =0   ;n                :n >=    - <0 NICHT      ;n
+:n <    - <0   ;n                :n <=    - >0 NICHT      ;n
+                                 :n <>0     =0 NICHT      ;n
+:n *       P* WEG ;n             :n P/     P/MOD WEG      ;n
+:n /MOD  #0 VERT P/MOD ;n        :n /       /MOD WEG      ;n 
+:n MOD  /MOD VERT WEG ;n         :n +! DUP @ RDO + VERT ! ;n
+
+( Compiler constants )
+#01C0  kon  SYSLINE        ( Posn.  buffer for messages )
+#042E  kon  READYFLAG      ( Compiler free to process input )
+#042F  kon  $PE            ( Pointer to end of input )
+#0431  kon  $PI            ( Compiler read pointer     )
+#0433  kon  $P1            ( Compiler parsing position )
+#0435  kon  $P2            ( End of block reached flag )
+#0437  kon  $P3            ( Link pointer for $SUCH  )
+#0439  kon  $H             ( Pointer to memory position )
+#043B  kon  LOADFLAG       ( Input coming from file )
+#FFF8  kon  $SL            ( Stack limit )
+#FF00  kon  $ML            ( Memory limit 64K )
+#0000  kon  $LL            ( End of IPS )
+
+$ccodes       @n kon DEFEX
+$ccodes 02 +n @n kon VAREX
+$ccodes 04 +n @n kon CONSEX
+
+#0000  kon  TV0            ( 1st   TV screen line position )
+#0100  kon  TV4            ( 4th   TV screen line position )
+#0200  kon  TV8            ( 8th   TV screen line position )
+#0000  kon  $TVS           ( Stack TV screen line position )
+#03FF  kon  $TVE           ( Last  TV screen line position )
+
+                    ( The Compiler )
+                    ( ------------ )
+
+#0004 feld $ND
+#0001 var $RS
+#0000 var $F1
+#0000 var $F2
+#0000 var $KK
+#0000 var BASIS
+#0000 var BEM
+#0001 var BEA
+#0000 var EINGABEZAHL
+#0000 var Z-LESEN
+#0000 var COMPILEFLAG
+#0000 var $V1
+#0000 var LINK
+(  Error messages )
+(  Default language        Alternative language )
+16 feld STACKMESSAGE    16 feld L-STACKMESSAGE
+16 feld MEMMESSAGE      16 feld L-MEMMESSAGE
+16 feld NAMEMESSAGE     16 feld L-NAMEMESSAGE
+16 feld STRUCMESSAGE    16 feld L-STRUCMESSAGE
+16 feld TEXTMESSAGE     16 feld L-TEXTMESSAGE
+16 feld RSMESSAGE       16 feld L-RSMESSAGE
+
+~ SPEICHER VOLL !  ~   'n MEMMESSAGE       02 +n $OC !t
+~ MEMORY FULL !    ~   'n L-MEMMESSAGE     02 +n $OC !t
+~ NAME FEHLT !     ~   'n NAMEMESSAGE      02 +n $OC !t
+~ NAME MISSING !   ~   'n L-NAMEMESSAGE    02 +n $OC !t
+~ STAPEL LEER !    ~   'n STACKMESSAGE     02 +n $OC !t
+~ STACK EMPTY !    ~   'n L-STACKMESSAGE   02 +n $OC !t
+~ STRUKTURFEHLER ! ~   'n STRUCMESSAGE     02 +n $OC !t
+~ STRUCTURE ERROR! ~   'n L-STRUCMESSAGE   02 +n $OC !t
+~ TEXTFEHLER !     ~   'n TEXTMESSAGE      02 +n $OC !t
+~ TEXT-ERROR !     ~   'n L-TEXTMESSAGE    02 +n $OC !t
+~ UNZUL. NAME !    ~   'n RSMESSAGE        02 +n $OC !t
+~ DUPLICATE NAME ! ~   'n L-RSMESSAGE      02 +n $OC !t
+
+( Compiler definitions )
+:n INCR   DUP  @  1  +  VERT  !  ;n
+:n HIER   $H  @  ;n
+:n H2INC  HIER  2  +  $H  !  ;n
+:n $DEP   HIER  !  H2INC  ;n
+:n $CEN   DUP  $IPSETZEN  DUP  @B  #80  ODER  ZWO  !B
+          $PI  !  $TVE  $PE  !  0  READYFLAG  !B  ;n
+:n IE  $P1 @ DUP $PI @ 1 -  je  I  @B  #80  EXO  I  !B
+                            nun  $CEN  WEG $CLOSEFILE  ;n
+#0  kon  $LANG                     ( Messages language switch )
+:n SYSWRITE $LANG +  SYSLINE 16 >>> 0 IE  ;n
+:n L>>> anfang DUP 256 > ja? 256 - S>R PDUP 256 >>>
+                            256 + VERT 256 + VERT R>S
+       dann/nochmal DUP >0 ja?  >>>
+                           nein: PWEG WEG
+                           dann ;n
+:n $SUCH  LINK @ $P3 ! $SCODE ;n
+
+:n $NAME   0   READYFLAG @B 0 $P2 !
+       ja? 1 $CSCAN >0
+          ja? $PI @ $P1 !
+              2 $CSCAN PWEG #CE57 #8D
+              $P1 @ $PI @ ZWO - DUP 63 > ja? WEG 63
+                                         dann
+              DUP $ND !B 1 - ZWO +
+              je I @B $POLYNAME
+              nun $ND 3 + !B $ND 1 + ! 1
+          dann
+       dann ;n
+
+:n $ZAHL 1 ( OK ) 0 ( ANF. ) $PI @ 1 - $P1 @
+  #2D ZWO @B = ja?    1 +  -1 S>R ( NEG ) 10 ( BASIS )
+               nein:        1 S>R ( POS )
+                    #23 ZWO @B =
+                    ja?   1 +             16
+                    nein: #42 ZWO @B =
+                          ja?    1 +       2
+                          nein:           10
+               dann dann  dann   BASIS !
+ VERT je BASIS @ * I @B DUP #3A < ja? #30 -
+                                  dann
+                        DUP #40 > ja? #37 -
+                                  dann
+         DUP BASIS @ >= ZWO <0 ODER ja? ( FEHLER ) WEG 0 RDU
+                                    dann +
+      nun R>S * VERT ;n
+
+
+:n COMPILER  $NAME
+ja? $SUCH
+    1   ( FUER WEITER ) BEM @B
+        ja? ZWO 'n RUMPELSTILZCHEN
+                = ja?   ( RUMP. ) 0 BEM !
+                  nein: ( NICHT RUMP. ) Z-LESEN @
+                       ja?   PWEG 0 1
+                       nein: ZWO BEA @ <
+                             ja? IE WEG 0
+                             dann
+                       dann
+                  dann
+        dann
+   ja?  ( WEITERFLAG ? )  DUP =0
+        ja? ( NUMBERPROCESSOR )
+         WEG $ZAHL
+          ja?  COMPILEFLAG @B
+            ja? DUP #FF00 UND
+             =0 ja? 'n 1BLITERAL $DEP
+                      HIER !B $H INCR
+                nein: 'n 2BLITERAL $DEP $DEP
+                dann
+            nein: BEM @B ja? EINGABEZAHL ! 0 Z-LESEN !
+                         dann
+            dann
+          nein: IE
+          dann
+      nein: ( FOUNDPROCESSOR ) DUP 6 - @B #C0 UND
+            COMPILEFLAG @B ODER
+            DUP 1 =
+            ja?   WEG HIER $ML >=U ja?  WEG MEMMESSAGE SYSWRITE
+                                  nein: $DEP
+                                  dann
+            nein: DUP #80 = VERT #C1 = ODER
+                  ja?    IE
+                  nein: R>S $V1 ! $TUE $V1 @ S>R
+                  dann
+            dann
+      dann
+      $PSHOLEN $SL > ja? $SL $PSSETZEN STACKMESSAGE SYSWRITE
+                       WEG $F1
+                   dann
+   dann
+dann READYFLAG @B $P2 @B UND
+   ja? #20 TV8 !B TV8 DUP 1 + $PI @ TV8 - 1 - L>>> TV8 $CEN
+   dann  ;n
+
+
+             ( Compiler Auxiliary routines )
+             ( --------------------------- )
+
+:n ENTRYSETUP $F1 $KK ! $NAME DUP
+       ja?   $SUCH =0 NICHT $RS @ UND
+             ja?   RSMESSAGE SYSWRITE WEG  0
+             nein: HIER DUP $KK ! LINK @ H2INC H2INC
+                   $DEP $ND ZWO 4 >>> LINK ! HIER VERT H2INC
+             dann
+       nein: NAMEMESSAGE SYSWRITE
+       dann ;n
+
+:n $GETADR $NAME ja?   $SUCH DUP =0
+                             ja?   IE      0
+                             nein:         1
+                             dann
+                nein: NAMEMESSAGE SYSWRITE 0
+                dann ;n
+:hpri  '     $GETADR ja? COMPILEFLAG @
+                        ja? 'n 2BLITERAL $DEP $DEP
+                        dann
+                    dann ;n
+
+:prior  ;     'n RETEX $DEP  0 COMPILEFLAG !B
+         $F2 <>
+         ja? STRUCMESSAGE $LANG  + SYSLINE #20 + 16 >>>
+             LINK @ DUP $H ! 4 + @ LINK !      0 IE
+         dann ;n
+
+:int  :   ENTRYSETUP ja? DEFEX VERT ! 1 COMPILEFLAG !B $F2
+                    dann ;n
+:n PRIMODIFY   $KK @ @B ODER $KK @ !B ;n
+
+:int :PRIOR  i> 'n  : $dep <i      #80 PRIMODIFY ;n
+:int :HPRI   i> 'n  : $dep <i      #40 PRIMODIFY ;n
+:int :INT    i> 'n  : $dep <i      #C0 PRIMODIFY ;n
+
+:prior JA? 'n BRONZ $DEP HIER H2INC ;n
+:prior DANN  HIER VERT ! ;n
+:prior NEIN: 'n JUMP $DEP HIER H2INC VERT i> 'n DANN $dep <i ;n
+:prior JE    'n $JEEX $DEP HIER H2INC ;n
+:prior NUN   'n LOOPEX  $DEP DUP i> 'n DANN $dep <i 2 + $DEP ;n
+:prior +NUN  'n +LOOPEX $DEP DUP i> 'n DANN $dep <i 2 + $DEP ;n
+:prior ANFANG HIER ;n
+:prior ENDE? 'n BRONZ $DEP $DEP ;n
+:prior DANN/NOCHMAL VERT 'n JUMP $DEP $DEP i> 'n DANN $dep <i ;n
+
+:int KON        ENTRYSETUP ja? CONSEX VERT ! $DEP
+                           dann ;n
+:int VAR        ENTRYSETUP ja? VAREX  VERT ! $DEP
+                           dann ;n
+:int FELD       ENTRYSETUP ja? VAREX  VERT ! HIER + $H !
+                           dann ;n
+   'n TV4 02 +n $OC @n var SP               (  Screen Pointer )
+:n !CHAR  SP @ !B SP INCR ;n
+:n TLITERAL  I 1 + R>S @B PDUP + S>R SP @ PDUP + SP !
+            VERT >>> ;n
+:hpri " $PI INCR $PI @ 0 ZWO DUP 257 + DUP $TVE >
+                                        ja? WEG $TVE dann
+        je $PI @ @B #22 =
+           ja?
+           R>S PWEG 1 I S>R
+           dann  $PI INCR
+        nun
+        ZWO $PI @ 2 - VERT - DUP >0 RDO UND
+        ja?  COMPILEFLAG @
+             ja?
+               S>R I  'n TLITERAL $DEP HIER !B
+               $H INCR HIER I >>> HIER  R>S + $H !
+             dann
+        nein:   TEXTMESSAGE SYSWRITE VERT WEG
+        dann   ;n
+
+:int !T  VERT  >>>  ;n
+
+:n LEERZ  S>R SP @ #20 ZWO !B DUP 1 + R>S 1 - L>>> ;n
+
+:int OK   SP @ SYSLINE SP !  #40 LEERZ  SP !  ;n
+
+:n !FK    S>R I 2 * + 1 R>S je 2 - DUP S>R ! R>S
+                           nun WEG ;n
+
+:n WAND BASIS @ 10 = ja?   DUP ( ZAHL ) <0
+                          ja? CHS #2D ( - ) !CHAR
+                          dann 10000 0 ( W.-ANFANG )
+                    nein: 16 BASIS ! #23 ( # ) !CHAR
+                          #1000 1 ( W.-ANFANG )
+                    dann  S>R
+   anfang VERT ZWO /MOD VERT
+            I NICHT ja?  DUP >0 ja? R>S WEG 1 S>R
+                    dann        dann
+                  I ja?  DUP  #30 + DUP #39 >
+                                    ja? 7 +
+                                    dann !CHAR
+                    dann
+                    WEG VERT BASIS @ / DUP =0
+   ende? PWEG R>S NICHT ja? #30 !CHAR
+                        dann ;n
+
+:n ZEIG-STAPEL
+   $P2 @ ja?
+         SP @ S>R  $TVS SP ! #80 LEERZ
+    $PSHOLEN $SL ZWO - DUP 32 > ja? WEG 32
+                                dann  S>R I +
+    anfang I >0
+      ja? DUP I - DUP 1 + @B 256 * VERT @B + R>S 2 - S>R
+        $TVS I 4 * + SP !  WAND
+      dann/nochmal
+    R>S  PWEG R>S SP !
+   dann ;n
+
+:n $INSERT  VERT  #7  UND    2  *  KETTE  +  !  ;n
+
+:n $CHAINACT  COMPILEFLAG  @
+             ja?    'n  2BLITERAL  $DEP  $DEP
+                    'n  $INSERT    $DEP
+             nein:  ZWO  #FFF8  UND  ( mask for 0-7 )
+                    =0  ja?    $INSERT
+                        nein:  IE
+                        dann
+             dann  ;n
+
+:hpri AUSH   'n  RUMPELSTILZCHEN  $CHAINACT  ;n
+:hpri EINH   $GETADR  ja?  $CHAINACT
+                      dann ;n
+
+:int ?  $GETADR  ja? 2 +
+                 dann  ;n
+
+:n SCHREIB    S>R SP @ I >>> SP @ R>S + SP ! ;n
+
+:int WEG/AB
+   $GETADR  ja?  DUP  $LL  VERT  >=U
+                 ja?    IE
+                 nein:  2  -  DUP  @  LINK  !  4  -  $H  !
+                 dann
+           dann  ;n
+                    ( End IPS-M )
+
+      ( File handling, utilities and extensions )
+      ( --------------------------------------- )
+
+:int CLS  $SL  $PSSETZEN  ;n                   (  Clear Stack )
+
+:int $SAVE  $SAVECODE      DUP  =0  ja?   IE
+                                    nein: WEG
+                                    dann      ;n
+
+:int $LOAD  $LOADCODE      DUP  =0  ja?   IE
+                                    nein: WEG
+                                    dann      ;n
+
+:int OSCLI $OSCLICODE      DUP  =0  ja?   IE
+                                    nein: WEG
+                                    dann     ;n
+
+:int READ  $OPENFILE       DUP  =0  ja?   IE  0
+                                    dann  LOADFLAG  !B  ;n
+
+:int DEFCHAR $DEFCHARCODE  DUP  =0  ja?   IE
+                                    nein: WEG
+                                    dann     ;n
+
+:n LANG <>0  ja?    L-STACKMESSAGE  STACKMESSAGE  -
+             nein:  0
+             dann  'n $LANG 2 + !  ;n
+
+:n S-ON i> 'n 0           $dep  'n 2BLITERAL $dep
+           'n ZEIG-STAPEL $dep  'n $INSERT   $dep <i ;n
+
+             ( Build the rest of SYSPAGE etc )
+             ( ----------------------------- )
+             
+hier 'n $LL #2 +n !O                                ( Set $LL )
+'n COMPILER                                (  Construct chain )
+'n ZEIG-STAPEL 'n RUMPELSTILZCHEN dup dup dup dup dup dup
+'n JUMP #0400   #0400 $OC 11 !fk
+
+                       hier $H !O                    ( Set $H )
+            'n $ND #2 +n #043E !O        ( Pointer for $SCODE )
+                      #200 $PI !O            ( Initialise $PI )
+$ccodes 22 +n @n 'n LINK #2 +n !O                  ( Set LINK )
+               ( End of metacompilation )
+
+       ( Save IPS-M binary image; compilation off )
+#0000 $OC hier $OC  ~ M-bin ~ $save   <X
+~ IPS-M compiled OK    ~ #01D5 !t        ( Information splash )
