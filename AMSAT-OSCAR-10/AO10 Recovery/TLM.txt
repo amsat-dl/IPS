@@ -1,0 +1,29 @@
+
+Hi  to all.  My TLM-Routine is now running nearly 5 hours  without 
+problems.  Healthy off  OSCAR-10 looks good  with  positive  power 
+budget.  The  value off U-BCR-IN seems to bee wrong due to  memory 
+failure.  But  U-BCR-OUT  and 14V-ST looks a little bit  too  high 
+(15V).  I wonder that A-BAT (auxillary battery?) is also  15V.  In 
+the  next few days (when OSCAR is again in a good  visibility  for 
+me) I will reset the BCR-Values (BCR-SIN and BCR-SO, which latched 
+in the BCR itself) to 28V / 13.9V. 
+
+Use  the  following IPS-definition on ATARI 800XL to  display  the 
+incoming telemetry:
+
+: TLM  #9200 64 + ( from YD-Buffer ) #8380 ( to Q-Block ) 64 >>> ;
+
+Usage:
+       TLM COM
+       TLM PWR
+       TLM TEMP
+       TLM NAV
+     
+Rem:  TLM  copies  the 64 telemetrie values  into  the  processing 
+buffer  (normally  the Q-Block).  The second operator is  used  to 
+update the QD-Display (i.e power, temperatures, etc.)
+
+
+Good Luck,  73 de Peter DB2OS
+
+
