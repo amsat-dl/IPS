@@ -1,0 +1,8 @@
+( IPS-C3 Patch for P3D-IHU Testing  22.3.96  )
+
+#C0 #835 !B     ( Jump from EB-Handler       )
+#0A #836 !B     ( to Interrupt Handler       )
+#3B #837 !B     ( Disable all 20ms other     )
+#35 #834 !B     ( than A/D, EB and Interrupt )
+
+

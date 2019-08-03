@@ -1,0 +1,27 @@
+: !CAN            ( Store Byte into CAN Register )
+  #FF00 +         ( add 82527 address offset     )
+  VERT NICHT      ( invert the data bits         )
+  VERT !B ;       ( write into 82527             )
+
+: @CAN            ( Get Byte from CAN Register   )
+  #FF00 +         ( add 82527 address offset     )
+  @B #00FF EXO ;  ( read and inverting low byte  )
+
+: INIT-82527
+  #02 @CAN     ( Check Hardware Reset Status    )
+  #41 #00 !CAN ( Enable Software Initialisation )
+  #00 #AF !CAN ( Configure Port P2 for Input    )
+  #00 #02 !CAN ( Load CPU Interface Register    )
+  #30 #1F !CAN ( Clockout Register              )
+  #00 #2F !CAN ( BUS Configuration Register     )
+  #CA #3F !CAN ( Bit Timing Register 0          )
+  #25 #4F !CAN ( Bit Timing Register 1          )
+               ( Hier Message Filter/Objekte    )
+  #00 #00 !CAN ( Initialisation finished        )
+  ;
+
+: TEST-CAN
+  #CF @CAN     ( Read Input P2   )
+  3 !2M        ( Output to 2MUX3 )
+  ;
+

@@ -1,0 +1,22 @@
+( IPS-C3 Patch for P3D-IHU Testing  23.3.96  )
+
+#C0 #835 !B     ( Jump from EB-Handler       )
+#0A #836 !B     ( to Interrupt Handler       )
+#3B #837 !B     ( Disable all 20ms other     )
+#35 #834 !B     ( than A/D, EB and Interrupt )
+
+
+CODE !S  ( ZIEL )  #41 LD IM #A PLO #A ->X
+         PS INC PS LDA #A STR PS INC PS LDA #A DEC
+         #A STR ( WERT ) #2 I/O #1 I/O #A DEC
+         0 LD IM #A STR #1 I/O NEXT
+         
+CODE RATTLE 
+         10 LD IM #C PLO 0 LD IM #C PHI #A ->X
+         #42 LD IM #A PLO
+         BEGIN #3 I/O #4 I/O #C DEC #C GLO
+         D=0 END NEXT
+
+
+: !W     #0F UND DUP + #440 + ! RATTLE ;
+         
