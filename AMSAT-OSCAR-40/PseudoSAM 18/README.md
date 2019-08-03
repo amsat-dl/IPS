@@ -12,4 +12,4 @@ EXAMPLE  ASM  Example file for PseudoSam 18.
 SYN      ASM  Synonym file to rename assembler directives.
 MNEMLEV1 ASM  Mnemnonics test program.
 MNEMLEV2 ASM  Mnemnonics test program.
-
+
