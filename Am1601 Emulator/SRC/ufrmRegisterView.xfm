@@ -1,0 +1,232 @@
+inherited frmRegisterView: TfrmRegisterView
+  Left = 359
+  Top = 125
+  Width = 547
+  Height = 319
+  VertScrollBar.Range = 313
+  HorzScrollBar.Range = 537
+  ActiveControl = edtEditWord
+  Caption = ' Register View'
+  PixelsPerInch = 96
+  TextHeight = 13
+  TextWidth = 6
+  object imgDump: TImage
+    Left = 8
+    Top = 8
+    Width = 393
+    Height = 265
+    Visible = False
+    OnMouseDown = imgDumpMouseDown
+  end
+  object imgMainView: TImage
+    Left = 8
+    Top = 8
+    Width = 393
+    Height = 265
+    Anchors = [akLeft, akTop, akBottom]
+    OnMouseDown = imgDumpMouseDown
+  end
+  object Panel1: TPanel
+    Left = 8
+    Top = 280
+    Width = 481
+    Height = 33
+    TabOrder = 0
+    object lblSelectedReg: TLabel
+      Left = 8
+      Top = 4
+      Width = 73
+      Height = 25
+      Alignment = taCenter
+      AutoSize = False
+      BorderStyle = bsSingle
+      Caption = 'P0'
+      Color = clWhite
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 16
+      Font.Name = 'Arial'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentColor = False
+      ParentFont = False
+    end
+    object edtEditWord: TEdit
+      Left = 88
+      Top = 5
+      Width = 41
+      Height = 24
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 13
+      Font.Name = 'Courier New'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 1
+      Text = '0000'
+      OnKeyUp = edtEditWordKeyUp
+    end
+    object btnSetWord: TButton
+      Left = 136
+      Top = 4
+      Width = 89
+      Height = 25
+      Caption = 'Set Register'
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 11
+      Font.Name = 'Microsoft Sans Serif'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 2
+      OnClick = btnSetWordClick
+    end
+    object lblSelectedFlag: TLabel
+      Left = 248
+      Top = 4
+      Width = 73
+      Height = 25
+      Alignment = taCenter
+      AutoSize = False
+      BorderStyle = bsSingle
+      Caption = 'C'
+      Color = clWhite
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 16
+      Font.Name = 'Arial'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentColor = False
+      ParentFont = False
+    end
+    object btnSetFlag: TButton
+      Left = 352
+      Top = 4
+      Width = 89
+      Height = 25
+      Caption = 'Set Flag'
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 11
+      Font.Name = 'Microsoft Sans Serif'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 4
+      OnClick = btnSetFlagClick
+    end
+    object chkbxFlag: TCheckBox
+      Left = 328
+      Top = 8
+      Width = 17
+      Height = 17
+      TabOrder = 5
+    end
+  end
+  object Panel2: TPanel
+    Left = 408
+    Top = 8
+    Width = 129
+    Height = 265
+    TabOrder = 1
+    object btnRST: TButton
+      Left = 24
+      Top = 16
+      Width = 81
+      Height = 25
+      Caption = 'Reset'
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 11
+      Font.Name = 'Microsoft Sans Serif'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 0
+      OnClick = btnRSTClick
+    end
+    object btnINT: TButton
+      Left = 24
+      Top = 48
+      Width = 81
+      Height = 25
+      Caption = 'Interrupt'
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 11
+      Font.Name = 'Microsoft Sans Serif'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 1
+      OnClick = btnINTClick
+    end
+    object btnStep: TButton
+      Left = 24
+      Top = 136
+      Width = 81
+      Height = 25
+      Caption = 'Step'
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 11
+      Font.Name = 'Microsoft Sans Serif'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 2
+      OnClick = btnStepClick
+    end
+    object btnRun: TButton
+      Left = 24
+      Top = 168
+      Width = 81
+      Height = 25
+      Caption = 'Run'
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 11
+      Font.Name = 'Microsoft Sans Serif'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 3
+      OnClick = btnRunClick
+    end
+    object btnPause: TButton
+      Left = 24
+      Top = 200
+      Width = 81
+      Height = 25
+      Caption = 'Pause'
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 11
+      Font.Name = 'Microsoft Sans Serif'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 4
+      OnClick = btnPauseClick
+    end
+    object pnlNext: TPanel
+      Left = 8
+      Top = 88
+      Width = 113
+      Height = 25
+      BevelInner = bvLowered
+      BevelOuter = bvLowered
+      Font.CharSet = fcsLatin1
+      Font.Color = clBlack
+      Font.Height = 12
+      Font.Name = 'Arial'
+      Font.Pitch = fpVariable
+      Font.Style = [fsBold]
+      ParentFont = False
+      TabOrder = 5
+    end
+  end
+end

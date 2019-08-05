@@ -1,0 +1,2047 @@
+(                       Am1601 Assembler                      )
+(                    Copyright 2002 AMSAT-DL                  )
+(                by Karl Meinzer, James Miller,               )
+(                 Lyle Johnson & Paul Willmott                )
+
+(    This program is free software; you can redistribute it   )
+(    and/or modify it under the terms of the GNU General      )
+(    Public License as published by the Free Software         ) 
+(    Foundation; either version 2 of the License, or at       ) 
+(    your option, any later version.                          )
+
+(    This program is distributed in the hope that it will     ) 
+(    be useful, but WITHOUT ANY WARRANTY; without even the    ) 
+(    implied warranty of MERCHANTABILITY or FITNESS FOR A     )
+(    PARTICULAR PURPOSE.  See the GNU General Public          ) 
+(    License for more details.                                )
+
+(    You should have received a copy of the GNU General       )
+(    Public License along with this program; if not, write    )
+(    to the Free Software Foundation, Inc., 59 Temple         )
+(    Place, Suite 330, Boston, MA  02111-1307  USA            )
+
+(                Contact : vp9mu@amsat.org                    )
+
+
+(    NOTE: stack comments have top on right                   )      
+
+(   "Assembler" definitions for use by IPS-X cross compiler   )
+
+:prior i> 0 compileflag !b ;n
+:int <i 1 compileflag !b ;n
+:n , hier $OC !b $h incr ;n
+:int code  entrysetup ja? hier vert !O
+                      dann ;n
+:int rcode entrysetup ja? !O dann ;n
+
+02 align !n                      ( set even address alignment )
+
+(                  Constants for cc codes                     )
+(                  ----------------------                     )
+
+#0 kon EQ #1 kon NE #2 kon CS #3 kon CC
+#4 kon MI #5 kon PL #6 kon VS #7 kon VC
+#8 kon HS #9 kon LO #A kon GE #B kon LT
+#C kon GT #D kon LE #E kon AL #F kon NEF
+#2 kon HI #3 kon LS
+
+( Comparison  Unsigned   Signed )
+( =           EQ         EQ     )
+( !=          NE         NE     )
+( >=          HS         GE     )
+( >           HI CS      GT     )
+( <=          LS CC      LE     )
+( <           LO         LT     )
+
+
+(                 Constants for PUSH & POP                    )
+(                 ------------------------                    )
+
+#00 kon PC  #10 kon PPC #20 kon HP  #30 kon FLAGS
+#40 kon PSP #50 kon PSC #60 kon RSP #70 kon RSC
+#80 kon EA  #90 kon RR
+
+(     Constants for Arithmetic/Logical Instruction Operands   )
+(     -----------------------------------------------------   )
+
+#00A0 kon uN                          ( unsigned operand flag )
+#00B0 kon sN                            ( signed operand flag )
+#00C0 kon P0                ( parameter stack register 0 flag )
+#00C0 kon P1                ( parameter stack register 1 flag )
+
+(          Constants for SET & CLEAR Instructions             )
+(          --------------------------------------             )
+
+#00 kon FLGC #10 kon FLGZ #20 kon FLGS  #30 kon FLGO
+#40 kon FLGE #50 kon FLGI #60 kon FLGIE #70 kon FLGEE
+
+(           byte manipulation and storage primitives          )
+(           ----------------------------------------          )
+
+:n sJCODE    ( <addr> <opcode>           )
+   vert      ( <opcode> <addr>           ) 
+   dup       ( <opcode> <addr> <addr>    ) 
+   #100 /n   ( <opcode> <addr> <MSBAddr> )
+   #0F und   ( restrict range to 0-F     )
+   rdo       ( <addr> <MSBaddr> <opcode> ) 
+   oder ,    ( <LSBaddr>                 )
+   #FF und , ( -                         )
+;n
+
+:n ccCODE , #0F und , ;n
+
+:n aluCODE        ( <P1/0> <subc>             )
+      zwo         ( <P1/0> <subc> <P1/0>      ) 
+      P1 =n ja?   ( <P1/0> <subc>             )
+         256 *n   ( <P1/0> <subc>*256         )
+         oder     ( <opcode>                  )
+         $dep     ( -                         )
+      nein:       ( <numb> <uN|sN> <subc>     )
+         16 /n    ( <numb> <uN|sN> <subc/16>  )
+         oder     ( <numb> <opcode>           )
+         ,        ( <numb>                    ) 
+         ,        ( -                         )
+      dann 
+;n
+
+(                      instructions                           )
+(                      ------------                           )
+
+:n sJMP   #00 sJCODE ;n
+:n sJSR   #10 sJCODE ;n
+:n sLOAD  #20 sJCODE ;n
+:n sSTORE #30 sJCODE ;n
+:n sBR    #40 sJCODE ;n
+:n sBSR   #50 sJCODE ;n
+:n cNLOAD #60 ccCODE $dep ;n
+:n uNLOAD #70 , , ;n
+:n sNLOAD #71 , , ;n
+
+:n cJSR     #80 ccCODE $dep ;n
+:n cJMP     #81 ccCODE $dep ;n
+:n cLOAD    #82 ccCODE $dep ;n
+:n cSTORE   #83 ccCODE $dep ;n
+:n cLOADB   #84 ccCODE $dep ;n
+:n cSTOREB  #85 ccCODE $dep ;n
+:n cpJSR    #88 ccCODE ;n
+:n cpJMP    #89 ccCODE ;n
+:n cpLOAD   #8A ccCODE ;n
+:n cpSTORE  #8B ccCODE ;n
+:n cpLOADB  #8C ccCODE ;n
+:n cpSTOREB #8D ccCODE ;n
+:n cRTS     #8E ccCODE ;n 
+:n cpBSR    #8F ccCODE ;n
+
+:n cBR #90 oder , , ;n
+
+:n ADD  #00 aluCODE ;n
+:n ADC  #10 aluCODE ;n
+
+:n SBC  dup P1 =n ja?
+            #50
+        nein:
+            #30 
+        dann
+        aluCODE ;n
+
+
+:n SUB  dup P1 =n ja?
+            #40
+        nein:
+            #20 
+        dann
+        aluCODE ;n
+
+:n RSBC dup P1 =n ja?
+            #30
+        nein:
+            #50 
+        dann
+        aluCODE ;n
+
+:n RSUB dup P1 =n ja?
+            #20
+        nein:
+            #40 
+        dann
+        aluCODE ;n
+
+:n AND  #60 aluCODE ;n  
+:n OR   #70 aluCODE ;n 
+:n EOR  #80 aluCODE ;n
+:n NOP  #90C0 $dep ;n
+
+:n CMP  dup P1 =n ja?
+            #A0
+        nein:
+            #B0 
+        dann
+        aluCODE ;n
+
+:n RCMP dup P1 =n ja?
+            #B0
+        nein:
+            #A0
+        dann
+        aluCODE ;n
+
+:n MASK #C0 aluCODE ;n  
+:n CPL  #D0C0 $dep ;n
+:n TST  #E0 aluCODE ;n
+:n NEG  #F0C0 $dep ;n
+
+:n DUPL #00C1 $dep ;n 
+:n DEL  #10C1 $dep ;n 
+:n SWAP #20C1 $dep ;n
+:n SOT  #30C1 $dep ;n 
+:n RTU  #40C1 $dep ;n 
+:n RTD  #50C1 $dep ;n
+:n PTOR #60C1 $dep ;n 
+:n RTOP #70C1 $dep ;n 
+:n IDX  #80C1 $dep ;n
+:n XRP  #90C1 $dep ;n
+:n LSL  #00C2 $dep ;n
+:n LSR  #10C2 $dep ;n
+:n ROL  #20C2 $dep ;n
+:n ROR  #30C2 $dep ;n
+:n ASR  #90C2 $dep ;n
+
+:n PUSHPS #D0 , , ;n 
+:n POPPS  #D1 , , ;n
+:n PUSHRS #D2 , , ;n 
+:n POPRS  #D3 , , ;n
+:n SET    #D4 , , ;n
+:n CLEAR  #D5 , , ;n
+
+:n cIN    #E2 ccCODE $dep ;n
+:n cOUT   #E3 ccCODE $dep ;n
+:n cINB   #E4 ccCODE $dep ;n
+:n cOUTB  #E5 ccCODE $dep ;n
+:n cpIN   #EA ccCODE ;n
+:n cpOUT  #EB ccCODE ;n
+:n cpINB  #EC ccCODE ;n
+:n cpOUTB #ED ccCODE ;n
+
+:n EMULATE #F0 ccCODE ;n 
+:n EXECUTE #F1 ccCODE ;n 
+:n PREPARE #F2 ccCODE ;n
+:n REFRESH #F6 ccCODE ;n 
+:n DFX     #00F8 $dep ;n
+:n 2BLIT   #00FB $dep ;n
+:n JPPC    #00FC $dep ;n
+:n XB      #00FD $dep ;n
+:n FLAG    #FF ccCODE ;n
+
+(                  Jump and Branch Tools                      )
+(                  ---------------------                      )
+
+:n sJSRbegin 
+     hier          ( push address onto IPS-X stack   )
+     h2inc         ( deposit placeholder             )
+;n                 ( <fixaddr>                       )
+
+:n sJSRcomplete    ( <fixaddr>                       )
+     hier          ( <fixaddr> <saveaddr>            )
+     dup           ( <fixaddr> <saveaddr> <saveaddr> )
+     rdo           ( <saveaddr> <saveaddr> <fixaddr> )
+     $h !n         ( <saveaddr> <saveaddr>           )
+     sJSR          ( <saveaddr>                      )
+     $h !n         ( -                               )
+;n
+
+:n sBRbegin 
+     hier          ( push address onto IPS-X stack   )
+     h2inc         ( deposit placeholder             )
+;n                 ( <fixaddr>                       )
+
+:n sBRcomplete     ( <fixaddr>                       )
+     dup           ( <fixaddr> <fixaddr>             )
+     02 +n         ( <fixaddr> <PC+2>                )
+     hier          ( <fixaddr> <PC+2> <jumpadd>      )
+     vert          ( <fixaddr> <jumpadd> <PC+2>      )
+     -n            ( <fixaddr> <offset>              )
+     hier          ( <fixaddr> <offset> <saveaddr>   )
+     rdu           ( <saveaddr> <fixaddr> <offset>   )
+     vert          ( <saveaddr> <offset> <fixaddr>   )
+     $h !n         ( <saveaddr> <offset>             )
+     sBR           ( <saveaddr>                      )
+     $h !n         ( -                               ) 
+;n
+
+:n sJMPbegin 
+     hier          ( push address onto IPS-X stack   )
+     h2inc         ( deposit placeholder             )
+;n                 ( <fixaddr>                       )
+
+:n sJMPcomplete    ( <fixaddr>                       )
+     hier          ( <fixaddr> <saveaddr>            )
+     dup           ( <fixaddr> <saveaddr> <saveaddr> )
+     rdo           ( <saveaddr> <saveaddr> <fixaddr> )
+     $h !n         ( <saveaddr> <saveaddr>           )
+     sJMP          ( <saveaddr>                      )
+     $h !n         ( -                               )
+
+;n
+
+:n sBSRbegin 
+     hier          ( push address onto IPS-X stack   )
+     h2inc         ( deposit placeholder             )
+;n                 ( <fixaddr>                       )
+
+:n sBSRcomplete    ( <fixaddr>                       )
+     dup           ( <fixaddr> <fixaddr>             )
+     02 +n         ( <fixaddr> <PC+2>                )
+     hier          ( <fixaddr> <PC+2> <jumpadd>      )
+     vert          ( <fixaddr> <jumpadd> <PC+2>      )
+     -n            ( <fixaddr> <offset>              )
+     hier          ( <fixaddr> <offset> <saveaddr>   )
+     rdu           ( <saveaddr> <fixaddr> <offset>   )
+     vert          ( <saveaddr> <offset> <fixaddr>   )
+     $h !n         ( <saveaddr> <offset>             )
+     sBSR          ( <saveaddr>                      )
+     $h !n         ( -                               ) 
+;n
+
+:n cJMPbegin       ( <cc>                            )
+     #81 , ,       ( - ) ( cJMP opcode deposited     )          
+     hier          ( push address onto IPS-X stack   )
+     h2inc         ( leave placeholder for address   )
+;n                 ( <fixaddr>                       )
+
+:n cJMPend         ( <fixaddr>                       )
+     hier          ( <fixaddr> <saveaddr>            )
+     vert          ( <saveaddr> <fixaddr>            )
+     $OC !n        ( -                               )
+;n
+
+:n cJMPelse        ( <fixaddr>                       )
+     AL cJMPbegin  ( <fixaddr> <fixaddr2>            )
+     vert          ( <fixaddr2> <fixaddr>            )
+     cJMPend       ( <fixaddr2>                      )
+;n
+
+:n cJSRbegin       ( <cc>                            )
+     #80 , ,       ( - ) ( cJSR opcode deposited     )          
+     hier          ( push address onto IPS-X stack   )
+     h2inc         ( leave placeholder for address   )
+;n                 ( <fixaddr>                       )
+
+:n cJSRcomplete    ( <fixaddr>                       )
+     hier          ( <fixaddr> <saveaddr>            )
+     vert          ( <saveaddr> <fixaddr>             )
+     $OC !n        ( -                               )
+;n
+
+
+:n cBRbegin        ( <cc>                            )
+     #90 oder ,    ( - ) ( cc cBR opcode deposited   )          
+     hier          ( push address onto IPS-X stack   )
+     #0 ,          ( leave placeholder for offset    )
+;n                 ( <fixaddr>                       )
+
+:n cBRend          ( <fixaddr>                       )
+     dup           ( <fixaddr> <fixaddr>             )
+     01 +n         ( <fixaddr> <PC+2>                )
+     hier          ( <fixaddr> <PC+2> <jumpadd>      )
+     vert          ( <fixaddr> <jumpadd> <PC+2>      )
+     -n            ( <fixaddr> <offset>              ) 
+     vert          ( <offset> <fixaddr>              )
+     $OC !b        ( -                               )
+;n
+
+:n cBRelse         ( <fixaddr>                       )
+     AL cBRbegin   ( <fixaddr> <fixaddr2>            )
+     vert          ( <fixaddr2> <fixaddr>            )
+     cBRend        ( <fixaddr2>                      )
+;n
+
+( these are the traditional IPS Assembler Definitions )
+
+:n Y? cJMPbegin ;n
+:n N: cJMPelse ;n
+:n TH cJMPend ;n
+:n BEGIN hier ;n
+:n END Y? $OC !n ;n         
+:n TH/AGAIN vert AL END TH ;n 
+
+(                   End Am1601 Assembler                      )
+(                   --------------------                      )
+
+
+
+(                     IPS-F1G for Am1601                      )
+(                   Copyright 2002 AMSAT-DL                   )
+(                by Karl Meinzer, James Miller,               )
+(                 Lyle Johnson & Paul Willmott                )
+
+(    This program is free software; you can redistribute it   )
+(    and/or modify it under the terms of the GNU General      )
+(    Public License as published by the Free Software         ) 
+(    Foundation; either version 2 of the License, or at       ) 
+(    your option, any later version.                          )
+
+(    This program is distributed in the hope that it will     ) 
+(    be useful, but WITHOUT ANY WARRANTY; without even the    ) 
+(    implied warranty of MERCHANTABILITY or FITNESS FOR A     )
+(    PARTICULAR PURPOSE.  See the GNU General Public          ) 
+(    License for more details.                                )
+
+(    You should have received a copy of the GNU General       )
+(    Public License along with this program; if not, write    )
+(    to the Free Software Foundation, Inc., 59 Temple         )
+(    Place, Suite 330, Boston, MA  02111-1307  USA            )
+
+(                Contact : vp9mu@amsat.org                    )
+
+(    NOTE: Lyle's stack comments have top on left             )
+(          Paul's stack comments have top on right            )      
+
+~      Compiling IPS-F1G      ~ #01D5 !t ( Information splash )
+
+
+(                     IPS-F1G Memory Map                      )
+(                     ------------------                      )
+
+( #0000 Reset Vector                                          )
+( #0004 Return Stack Underflow Vector                         )
+( #0008 Parameter Stack Underflow Vector                      )
+( #000C PC Odd Vector                                         )
+( #0010 Maskable Interrupt Vector                             )
+
+( #0100 Screen                                                )
+( #0500 Syspage                                               )
+
+(                 Syspage assignments 500-57F                 )
+(                 ---------------------------                 )
+
+( 500  ' COMPILER                    520  SU0 Minutes LSW     )
+( 501                                521  SU0 Minutes MSW     )
+( 502  0 ' ZEIG-STAPEL <KETTE>       522  SU1 10ms    <0-98>  ) 
+( 503                                523  SU1 Seconds <0-59>  )
+( 504  1                             524  SU1 Minutes LSW     )
+( 505                                525  SU1 Minutes MSW     )
+( 506  2                             526  SU2 10ms    <0-98>  ) 
+( 507                                527  SU2 Seconds <0-59>  )
+( 508  3                             528  SU2 Minutes LSW     )
+( 509                                529  SU2 Minutes MSW     )
+( 50A  4                             52A  SU3 10ms    <0-98>  ) 
+( 50B                                52B  SU3 Seconds <0-59>  )
+( 50C  5                             52C  SU3 Minutes LSW     )
+( 50D                                52D  SU3 Minutes MSW     )
+( 50E  6                             52E  READYFLAG           )
+( 50F                                52F  LOADFLAG            )
+( 510  7                             530  $PE value           )
+( 511                                531                      )
+( 512  JUMP                          532  $PI value           )
+( 513                                533                      )
+( 514  #0500                         534  $P1 value           )
+( 515                                535                      ) 
+( 516  --                            536  $P2 value           )
+( 517  --                            537                      )
+( 518  UHR 10ms    <0-98>            538  $P3 value           )
+( 519  UHR Seconds <0-59>            539                      )
+( 51A  UHR Minutes <0-59>            53A  $H  value           )
+( 51B  UHR Hours   <0-23>            53B                      )
+( 51C  UHR Days LSW                  53C  $Os value           )
+( 51D  UHR Days MSW                  53D                      )
+( 51E  SU0 10ms    <0-98>            53E  $ND value           )
+( 51F  SU0 Seconds <0-59>            53F                      )
+
+( #0540 - #054F reserved for 20ms use                         )
+
+( 540  Keyboard Input Pointer                                 )
+( 541                                                         )
+( 542  Insert Flag                                            )
+
+( #0600 Reset Service Routine                                 )
+
+( #0650 20ms Service Routine                                  )
+
+( #FEFE Parameter Stack Overflow Start                        )
+( #FFFE Return Stack Overflow Start                           )
+
+( Constants in the IPS-X definition list for the compilation  )
+(                of the code and 20ms routines                )
+ 
+
+#0100 kon $$tv0               ( 1st   TV screen line position )
+#0200 kon $$tv4               ( 4th   TV screen line position )
+#0300 kon $$tv8               ( 8th   TV screen line position )
+#0100 kon $$tvs               ( Stack TV screen line position )
+#04FF kon $$tve               ( Last  TV screen line position )
+#052E kon $$readyflag                    ( Compiler READYFLAG )
+#0530 kon $$pe                       ( $PE address in syspage )
+#0532 kon $$pi                       ( $PI address in syspage )
+#0540 kon $$kbdip                    ( Keyboard Input Pointer )
+#0542 kon $$inson                       ( Insert Mode On Flag )
+#0    kon $$kpport        ( Keyboard Pressed I/O Port Address )                     
+#2    kon $$kvport       ( Key Pressed Value I/O Port Address )
+#0650 kon $$20ms                       ( 20ms Service Routine )
+:n NEXT NEF EMULATE $$20ms sJMP ;n
+
+X>>                                      ( Enter compile mode )
+
+#0000 $h !n
+#0 hier !O hier $OC dup 1 +n #3FFF l>>>         ( Wipe memory )
+
+#0000 $h !n #0600 sJMP                         ( Reset Vector )
+#0004 $h !n 
+#0008 $h !n
+#000C $h !n
+#0010 $h !n
+
+(                Fill screen buffer with spaces               )
+(                ------------------------------               )
+
+#20 $$tv0 !O $$tv0 $OC dup 1 +n #3FF l>>>
+
+ 
+~   IPS-F1G 2002-Oct-28c   ~ #02D5 $OC !t        ( Identifier )
+
+#0518 $h !n                                             ( UHR )
+0 , 0 , 0 , 0 , 0 , 0 ,
+
+#051E $h !n                                    ( Stop watches )
+1 , 0 , 0 , 0 ,  1 , 0 , 0 , 0 ,
+1 , 0 , 0 , 0 ,  1 , 0 , 0 , 0 ,
+
+(              #540-#54F free for implementor's use           )
+(              ------------------------------------           )
+
+#0600 $h !n                           ( Reset Service Routine )
+#FFFE AL cNLOAD RSP POPPS                           ( Set RSP )
+#0004 AL cNLOAD RSC POPPS             ( Max 4 items underflow )
+#FEFE AL cNLOAD PSP POPPS                           ( Set PSP )
+#0004 AL cNLOAD PSC POPPS             ( Max 4 items underflow )
+#0500 AL cNLOAD PPC POPPS                           ( Set PPC )
+AL EMULATE                             ( Start it Running !!! )
+
+$$20ms $h !n
+
+( UHR & Stopwatches ) 
+
+sJSRbegin ( UHR )
+#051E AL cNLOAD sJSRbegin ( SU0 StopWatch )
+#0522 AL cNLOAD sJSRbegin ( SU1 StopWatch )
+#0526 AL cNLOAD sJSRbegin ( SU2 StopWatch )
+#052A AL cNLOAD sJSRbegin ( SU3 StopWatch )
+
+$$readyflag AL cLOADB 
+#01 uN AND DEL EQ cJSRbegin ( Keyboard Handler )
+
+AL REFRESH
+FLGE CLEAR
+AL EMULATE
+
+(   The Keyboard Handler processes one key press before )
+(   returning control to 20ms routine.                  )
+
+cJSRcomplete ( Keyboard Handler )
+
+    $$kpport AL cINB      ( KyP              )
+    #1 uN AND             ( KyP              )
+    DEL                   (                  )
+    EQ cRTS               ( Quit if no key   )
+
+(   The previous blob cursor is removed. The Blob      )
+(   cursor uses the fact that setting the MS bit of a  )
+(   character in the iPS screen area causes it to be   )
+(   displayed in reverse video.                        )
+
+    $$kbdip AL cLOAD      ( Adr              )
+    DUPL                  ( Adr Adr          )
+    AL cpLOADB            ( Adr Chr          )
+    #7F uN AND            ( Adr Chr          )
+    SWAP                  ( Chr Adr          )
+    AL cpSTOREB           ( -                )
+
+(   Get key value from Input Port )
+
+    $$kvport AL cIN       ( Chr              )
+    #00 uNLOAD            ( 0 Chr            )
+    $$kpport AL cOUTB     ( Chr              )
+    
+(   PC Control Keys: If the key pressed is not an    )
+(   ASCII key, e.g. the cursor keys. Then the        )
+(   hardware returns #FF in the MSB of the keyboard  )
+(   buffer, otherwise #00.                           )
+
+    DUPL                  ( Chr Chr          )   
+    #FF uNLOAD            ( Chr Chr #FF      )
+    XB                    ( Chr Chr #FF00    )
+    P1 AND DEL            ( Chr              )
+    #02 NE cBR            ( Chr              )
+
+( branch to nCtrl: )
+    sBRbegin              ( Chr              )
+
+    #FF uN AND            ( Chr              )
+
+( Chk71: Home                                        )
+( Move the blob cursor to the start of the IPS input )
+( screen area                                        )
+( -------------------------------------------------- )
+
+    71 uN CMP             ( Chr              )
+
+( branch to Chk72: )
+    12 NE cBR             ( Chr              )
+       DEL                (                  )
+       $$tv8 AL cNLOAD    ( TV8              )
+       $$kbdip AL cSTORE  (                  )
+( branch to PtrLim: )
+       sBRbegin
+    
+( Chk72: Up Arrow                  )
+( Move the blob cursor up one line )
+( -------------------------------- )
+
+    72 uN CMP             ( Chr              )
+( branch to Chk75: )
+    14 NE cBR             ( Chr              )
+
+       DEL                (                  )
+       $$kbdip AL cLOAD   ( KIP              )
+       64 uN SUB          ( KIP              )
+       $$kbdip AL cSTORE  (                  )
+( branch to PtrLim: )
+       sBRbegin
+
+( Chk75: Left Arrow                                )
+( Move the blob cursor 1 character position to the )
+( left.                                            )
+( ------------------------------------------------ )
+
+    75 uN CMP             ( Chr           )
+( branch to Chk75: )
+    14 NE cBR             ( Chr           )
+
+       DEL                (               )
+       $$kbdip AL cLOAD   ( KIP           )
+       01 uN SUB          ( KIP           )
+       $$kbdip AL cSTORE  (               )
+( branch to PtrLim: )
+       sBRbegin
+
+( Chk77: - Right Arrow  )
+( Move the blob cursor right 1 character position  )
+( -----------------------------------------------  )
+
+    77 uN CMP             ( Chr              )
+( branch to Chk79: )
+    14 NE cBR             ( Chr              )
+
+       DEL                (                  )
+       $$kbdip AL cLOAD   ( KIP              )
+       01 uN ADD          ( KIP              )
+       $$kbdip AL cSTORE  (                  )
+( branch to PtrLim: )
+       sBRbegin
+
+( Chk79: End )
+( Move the blob cursor to the end of the IPS Input )
+( Area.                                            )
+( ------------------------------------------------ )
+
+    79 uN CMP             ( Chr              )
+( branch to Chk80: )
+    12 NE cBR             ( Chr              )
+
+       DEL                (                  )
+       $$tve AL cNLOAD    ( TVE              )
+       $$kbdip AL cSTORE  (                  )
+( branch to PtrLim: )
+       sBRbegin
+
+( Chk80: - Down Arrow                 )
+( Move the blob cursor down one line. )
+( ----------------------------------- )
+
+    80 uN CMP             ( Chr              )
+( branch to Chk82: )
+    14 NE cBR             ( Chr              )
+
+       DEL                (                  )
+       $$kbdip AL cLOAD   ( KIP              )
+       64 uN ADD          ( KIP              )
+       $$kbdip AL cSTORE  (                  )
+( branch to PtrLim: )
+       sBRbegin
+
+( Chk82: - Insert              )
+( Toggle the insert mode flag. )
+( ---------------------------- )
+
+
+    82 uN CMP             ( Chr              )
+( branch to Chk83: )
+    14 NE cBR             ( Chr              )
+
+       DEL                (                  )
+       $$inson AL cLOADB  ( Ins              )
+       #01 uN EOR         ( ~Ins             )
+       $$inson AL cSTOREB (                  )
+( branch to PtrLim: )
+       sBRbegin
+
+( Chk83: - Delete                             )
+( Delete the character under the blob cursor. )
+( ------------------------------------------- )
+
+    83 uN CMP             ( Chr              )
+( branch to Chk45: )
+    48 NE cBR             ( Chr              )
+
+       DEL                (                  )
+       $$tve AL cNLOAD    ( TVE              )
+       $$kbdip AL cLOAD   ( TVE KIP          )
+       P0 CMP             ( TVE KIP          )
+( branch to PutSpc: )
+       EQ cBRbegin        ( TVE KIP          )
+
+( Loop: )
+       DUPL               ( P: KIP KIP TVE      R: )
+       01 uN ADD          ( P: KI+ KIP TVE      R: )
+       DUPL               ( P: KI+ KI+ KIP TVE  R: )
+       PTOR               ( P: KI+ KIP TVE      R: KI+ )
+       AL cpLOADB         ( P: Suc KIP TVE      R: )
+       SWAP               ( P: KIP Suc TVE      R: KI+ )
+       AL cpSTOREB        ( P: TVE              R: KI+ )
+       DUPL               ( P: TVE TVE          R: KI+ )
+       RTOP               ( P: KI+ TVE TVE      R: )
+       DUPL               ( P: KI+ KI+ TVE TVE  R: )
+       RTD                ( P: TVE KI+ KI+ TVE  R: )
+       P0 SUB             ( P: Dif KI+ TVE      R: )
+       DEL                ( P: KI+ TVE          R: )
+( branch to Loop: )
+       -28 NE cBR         ( P: KI+ TVE          R: )
+
+( PutSpc: )
+       cBRend
+       DEL                ( TVE              )
+       32 uNLOAD          ( TVE 32           )
+       SWAP               ( 32 TVE           )
+       AL cpSTOREB        (                  )
+( branch to PtrLim: )
+
+( PtrLim: INPUTPOINTER := INPUTPOINTER AND $3FF )
+( offset by +#0100 for Am1601 ...               )
+( --------------------------------------------- )
+
+sBRcomplete ( Insert )
+sBRcomplete ( Down Arrow )
+sBRcomplete ( End )
+sBRcomplete ( Right Arrow )
+sBRcomplete ( Left Arrow )
+sBRcomplete ( Up Arrow )
+sBRcomplete ( Home )
+
+    $$kbdip AL cLOAD      ( P: KIP              R: )    
+    #100 AL cNLOAD        ( P: 100 KIP          R: )
+    DUPL                  ( P: 100 100 KIP      R: )
+    RTD                   ( P: KIP 100 100      R: )
+    P1 RSUB               ( P: KIP 100          R: )
+    #3FF AL cNLOAD        ( P: 3FF KIP 100      R: )
+    P1 AND                ( P: KIP 100          R: )
+    P1 ADD                ( P: KIP              R: )
+    $$kbdip AL cSTORE     ( P:                  R: )
+( branch to PutBlob: )
+    220 sBR               (                  )
+
+( nCtrl: ASCII Characters )
+sBRcomplete
+
+( CkkCR: Carriage Return / Enter - Start Compiler )
+( ----------------------------------------------- )
+
+    13 uN CMP             ( Chr              )
+( branch to ChkBS: )
+    14 NE cBR             ( Chr              )
+
+    DEL                   (                  )
+    $$kbdip AL cLOAD      ( KIP              )
+    01 uN SUB             ( KI-              )
+    $$pe AL cSTORE        (                  )
+( branch to PutBlob: )
+    202 sBR               (                  )
+
+( ChkBS: BackSpace                                    )
+( Delete the character to the left of the blob cursor )
+( --------------------------------------------------- )
+
+    8 uN CMP              ( Chr              )
+( branch to Other: )
+    94 NE cBR             ( Chr              )
+
+    DEL                   (                  ) 
+    $$kbdip AL cLOAD      ( P: KIP              R: )    
+    01 uN SUB             ( P: KIP              R: )
+    #100 AL cNLOAD        ( P: 100 KIP          R: )
+    DUPL                  ( P: 100 100 KIP      R: )
+    RTD                   ( P: KIP 100 100      R: )
+    P1 RSUB               ( P: KIP 100          R: )
+    #3FF AL cNLOAD        ( P: 3FF KIP 100      R: )
+    P1 AND                ( P: KIP 100          R: )
+    P1 ADD                ( P: KIP              R: )
+    DUPL                  ( P: KIP KIP          R: )
+    $$kbdip AL cSTORE     ( P: KIP              R: )
+
+    32 uNLOAD             ( P: 32 KIP           R: )
+    SWAP                  ( P: KIP 32           R: )
+    AL cpSTOREB           ( P:                  R: )
+
+
+(   IF InsertON THEN )
+    $$inson AL cLOADB     ( P: Ins              R: )
+    01 uN AND             ( P: Ins              R: )
+    DEL                   ( P:                  R: )
+( branch to Other: )
+    44 EQ cBR             ( P:                  R: )
+
+(   FOR Index := INPUTPOINTER TO TVE DO )
+    $$tve AL cNLOAD       ( P: TVE              R: )
+    $$kbdip AL cLOAD      ( P: KIP TVE          R: )
+
+( Loop: )
+       DUPL               ( P: KIP KIP TVE      R: )
+       01 uN ADD          ( P: KI+ KIP TVE      R: )
+       DUPL               ( P: KI+ KI+ KIP TVE  R: )
+       PTOR               ( P: KI+ KIP TVE      R: KI+ )
+       AL cpLOADB         ( P: Suc KIP TVE      R: )
+       SWAP               ( P: KIP Suc TVE      R: KI+ )
+       AL cpSTOREB        ( P: TVE              R: KI+ )
+       DUPL               ( P: TVE TVE          R: KI+ )
+       RTOP               ( P: KI+ TVE TVE      R: )
+       DUPL               ( P: KI+ KI+ TVE TVE  R: )
+       RTD                ( P: TVE KI+ KI+ TVE  R: )
+       P0 SUB             ( P: Dif KI+ TVE      R: )
+       DEL                ( P: KI+ TVE          R: )
+( branch to Loop: )
+    -28 NE cBR            ( P: KI+ TVE          R: )
+
+    DEL                   ( P: TVE              R: )
+    32 uNLOAD             ( P: 32  TVE          R: )
+    SWAP                  ( P: TVE 32           R: )
+    AL cpSTOREB           ( P:                  R: )
+
+( branch to PutBlob: )
+    104 AL cBR            ( P:                  R: )
+
+( Other: ELSE BEGIN )
+( IF InsertON AND TV8<=INPUTPOINTER THEN  )
+
+    $$inson AL cLOADB     ( P: Ins Chr          R: )
+    01 uN AND             ( P: Ins Chr          R: )
+    DEL                   ( P: Chr              R: )
+( branch to PutChr: )
+    60 EQ cBR             ( P:                  R: )
+
+    $$kbdip AL cLOAD      ( P: KIP Chr          R: )
+    $$tv8 AL cNLOAD       ( P: TV8 KIP Chr      R: )
+    P0 SUB                ( P: Dif Chr          R: )
+    DEL                   ( P: Chr              R: )
+( branch to PutChr: )
+    46 LT cBR             ( P: Chr              R: )
+
+(   FOR Index := TVE DOWNTO INPUTPOINTER+1 DO BEGIN )
+    PTOR                  ( P:              R: Chr )  
+    $$kbdip AL cLOAD      ( P: KIP          R: Chr )
+    01 uN ADD             ( P: KI+          R: Chr )
+    $$tve AL cNLOAD       ( P: TVE KI+      R: Chr )
+
+( Loop: )
+    DUPL                  ( P: TVE TVE KI+      R: Chr )
+    01 uN SUB             ( P: TV- TVE KI+      R: Chr )
+    DUPL                  ( P: TV- TV- TVE KI+  R: Chr )
+    PTOR                  ( P: TV- TVE KI+      R: TV- Chr )
+    AL cpLOADB            ( P: Pre TVE KI+      R: TV- Chr )
+    SWAP                  ( P: TVE Pre KI+      R: TV- Chr )
+    AL cpSTOREB           ( P: KI+              R: TV- Chr )
+    DUPL                  ( P: KI+ KI+          R: TV- Chr )
+    RTOP                  ( P: TV- KI+ KI+      R: Chr )
+    DUPL                  ( P: TV- TV- KI+ KI+  R: Chr )
+    RTD                   ( P: KI+ TV- TV- KI+  R: Chr )
+    P0 SUB                ( P: Dif TV- KI+      R: Chr )
+    DEL                   ( P: TV- KI+          R: Chr )
+( branch to Loop: )
+    -28 NE cBR            ( P: TV- KI+          R: Chr )
+    DEL                   ( P: KI+              R: Chr )
+    DEL                   ( P:                  R: Chr )
+    RTOP                  ( P: Chr              R: )
+
+( PutChr: )
+    $$kbdip AL cLOAD      ( P: KIP Chr          R: )
+    DUPL                  ( P: KIP KIP Chr      R: )
+    RTU                   ( P: KIP Chr KIP      R: )
+    AL cpSTOREB           ( P: KIP              R: )
+
+    01 uN ADD             ( P: KIP              R: )
+    #100 AL cNLOAD        ( P: 100 KIP          R: )
+    DUPL                  ( P: 100 100 KIP      R: )
+    RTD                   ( P: KIP 100 100      R: )
+    P1 RSUB               ( P: KIP 100          R: )
+    #3FF AL cNLOAD        ( P: 3FF KIP 100      R: )
+    P1 AND                ( P: KIP 100          R: )
+    P1 ADD                ( P: KIP              R: )
+    $$kbdip AL cSTORE     ( P:                  R: )
+
+( PutBlob:                                       )
+( Put Blob Cursor On Screen iff not end of input )
+( ---------------------------------------------- )
+
+    $$kbdip AL cLOAD      ( P: KIP              R: )    
+    $$pe AL cLOAD         ( P: PE  KIP          R: )
+    P0 SUB                ( P: Dif              R: )
+    DEL                   ( P:                  R: )
+( branch to doit: ) 
+    08 HS cBR             ( P:                  R: )
+    #01 uNLOAD            ( P: #01              R: )  
+    $$readyflag AL cSTOREB 
+    PC POPRS
+
+( doit: )
+    $$kbdip AL cLOAD      ( P: KIP              R: )
+    DUPL                  ( P: KIP KIP          R: )
+    AL cpLOADB            ( P: Chr KIP          R: )
+    #80 uN OR             ( P: Chr KIP          R: )
+    SWAP                  ( P: KIP Chr          R: )
+    AL cpSTOREB           ( P:                  R: )
+    PC POPRS
+
+sJSRcomplete ( SU3 StopWatch )
+sJSRcomplete ( SU2 StopWatch )
+sJSRcomplete ( SU1 StopWatch )
+sJSRcomplete ( SU0 StopWatch )
+
+( STOPWATCH )         ( P: SU+0           R: RetAdr )
+    DUPL              ( P: SU+0 SU+0      R: RetAdr )
+    AL cpLOADB        ( P: mSec SU+0      R: RetAdr )
+( if LSB is set, then timer has already expired )
+    #1 uN TST         ( P: mSec SU+0      R: RetAdr )
+    #48 EQ cBR        ( P: mSec SU+0      R: RetAdr )
+( stopwatch has expired, clean stack and exit )
+    DEL               ( P: SU+0           R: RetAdr )
+    DEL               ( P:                R: RetAdr )
+    PC POPRS
+
+( timer not expired, check if mSec is 0 )
+    #0 uN CMP         ( P: mSec SU+0      R: RetAdr )
+    #08 EQ cBR        ( P: mSec SU+0      R: RetAdr )
+( mSec not expired, decrement and exit )
+    #2 uN SUB         ( P: mSec SU+0      R: RetAdr )
+    SWAP              ( P: SU+0 mSec      R: RetAdr )
+    AL cpSTOREB       ( P:                R: RetAdr )
+    PC POPRS
+
+( mSec at 0, reload and check Sec )
+    98 uN ADD         ( P: 98   SU+0      R: RetAdr )
+    SOT               ( P: SU+0 98   SU+0 R: RetAdr )
+    AL cpSTOREB       ( P: SU+0           R: RetAdr )
+    #1 uN ADD         ( P: SU+1           R: RetAdr )
+    DUPL              ( P: SU+1 SU+1      R: RetAdr )
+    AL cpLOADB        ( P: Sec  SU+1      R: RetAdr )
+( Sec 0 ? )
+    #0 uN CMP         ( P: Sec  SU+1      R: RetAdr )
+    #08 EQ cBR        ( P: Sec  SU+1      R: RetAdr )
+
+( Sec not 0, decrement and exit )
+    #1 uN SUB         ( P: Sec  SU+1      R: RetAdr )
+    SWAP              ( P: SU+1 Sec       R: RetAdr )
+    AL cpSTOREB       ( P:                R: RetAdr )
+    PC POPRS
+( Sec at 0, reload and check min )
+    59 uN ADD         ( P: 59   SU+1      R: RetAdr )
+    SOT               ( P: SU+1 59   SU+1 R: RetAdr )
+    AL cpSTOREB       ( P: SU+1           R: RetAdr )
+    #1 uN ADD         ( P: SU+2           R: RetAdr )
+    DUPL              ( P: SU+2 SU+2      R: RetAdr )
+    AL cpLOAD         ( P: min  SU+2      R: RetAdr )
+( Min  0 ? )
+    #0 uN CMP         ( P: min  SU+2      R: RetAdr )
+    #08 EQ cBR        ( P: min SU+2       R: RetAdr )
+( Min not 0, decrement and exit)
+    #1 uN SUB         ( P: min  SU+2      R: RetAdr )
+    SWAP              ( P: SU+0 min       R: RetAdr )
+    AL cpSTORE        ( P:                R: RetAdr )
+    PC POPRS
+
+( timer just expired, clean up and set expired flag in mSec )
+    DEL               ( P: SU+2           R: RetAdr )
+    #2 uN SUB         ( P: SU+0           R: RetAdr )
+    #1 uNLOAD         ( P: 1    SU+0      R: RetAdr )
+    SWAP              ( P: SU+0 1         R: RetAdr )
+    AL cpSTOREB       ( P:                R: RetAdr )
+    PC POPRS
+
+sJSRcomplete ( UHR ) 
+
+#0518 AL cNLOAD      ( P: UHR+0             R: RetAdr )
+    DUPL             ( P: UHR+0 UHR+0       R: RetAdr )
+    AL cpLOADB       ( P: mSec  UHR+0       R: RetAdr )
+( if mSec is 98, then update and check Sec )
+    98 uN CMP        ( P: mSec  UHR+0       R: RetAdr )
+    #08 EQ cBR       ( P: mSec  UHR+0       R: RetAdr )
+( else inc mSec by 2 and exit )
+    #2 uN ADD        ( P: mSec  UHR+0       R: RetAdr )
+    SWAP             ( P: UHR+0 mSec        R: RetAdr )
+    AL cpSTOREB
+    PC POPRS
+
+( update mSec and check Sec )
+    DEL              ( P: 0                 R: RetAdr )
+    #0 uNLOAD        ( P: 0     UHR+0       R: RetAdr )
+    SOT              ( P: UHR+0     0 UHR+0 R: RetAdr )
+    AL cpSTOREB      ( P: UHR+0             R: RetAdr )
+    #1 uN ADD        ( P: UHR+1             R: RetAdr )
+    DUPL             ( P: UHR+1 UHR+1       R: RetAdr )
+    AL cpLOADB       ( P: Sec   UHR+1       R: RetAdr )
+( if Sec is 59, then update and check Min )
+    59 uN CMP        ( P: Sec   UHR+1       R: RetAdr )
+    #08 EQ cBR       ( P: Sec   UHR+1       R: RetAdr )
+( else inc Sec by 1 and exit )
+    #1 uN ADD        ( P: Sec   UHR+1       R: RetAdr )
+    SWAP             ( P: UHR+1 Sec         R: RetAdr )
+    AL cpSTOREB
+    PC POPRS
+
+( update Sec and check Min )
+    DEL              ( P:                   R: RetAdr )
+    #0 uNLOAD        ( P: 0     UHR+1       R: RetAdr )
+    SOT              ( P: UHR+1     0 UHR+1 R: RetAdr )
+    AL cpSTOREB      ( P: UHR+1             R: RetAdr )
+    #1 uN ADD        ( P: UHR+2             R: RetAdr )
+    DUPL             ( P: UHR+2 UHR+2       R: RetAdr )
+    AL cpLOADB       ( P: Min   UHR+2       R: RetAdr )
+( if Min is 59, then update and check Hour )
+    59 uN CMP        ( P: Min   UHR+2       R: RetAdr )
+    #08 EQ cBR       ( P: Min   UHR+2       R: RetAdr )
+( else inc Min by 1 and exit )
+    #1 uN ADD        ( P: Min   UHR+2       R: RetAdr )
+    SWAP             ( P: UHR+2 Min         R: RetAdr )
+    AL cpSTOREB
+    PC POPRS
+
+( update Min and check Hour )
+    DEL              ( P:                   R: RetAdr )
+    #0 uNLOAD        ( P: 0     UHR+2       R: RetAdr )
+    SOT              ( P: UHR+2     0 UHR+2 R: RetAdr )
+    AL cpSTOREB      ( P: UHR+2             R: RetAdr )
+    #1 uN ADD        ( P: UHR+3             R: RetAdr )
+    DUPL             ( P: UHR+3 UHR+3       R: RetAdr )
+    AL cpLOADB       ( P: Hour  UHR+3       R: RetAdr )
+( if Hour is 23, then update and inc Day )
+    23 uN CMP        ( P: Hour  UHR+3       R: RetAdr )
+    #08 EQ cBR       ( P: Hour  UHR+3       R: RetAdr )
+
+( else inc Hour by 1 and exit )
+    #1 uN ADD        ( P: Hour  UHR+3       R: RetAdr )
+    SWAP             ( P: UHR+3 Hour        R: RetAdr )
+    AL cpSTOREB
+    PC POPRS
+
+( update Hour and increment Day )
+    DEL
+    #0 uNLOAD        ( P: 0     UHR+3       R: RetAdr )
+    SOT              ( P: UHR+3     0 UHR+3 R: RetAdr )
+    AL cpSTOREB      ( P: UHR+3             R: RetAdr )
+    #1 uN ADD        ( P: UHR+4             R: RetAdr )
+    DUPL             ( P: UHR+4 UHR+4       R: RetAdr )
+    AL cpLOAD        ( P: Days  UHR+4       R: RetAdr )
+    #1 uN ADD        ( P: Days  UHR+4       R: RetAdr )
+    AL cpSTORE
+    PC POPRS
+
+(                       Code Routines                         )
+(                       -------------                         )
+
+( DEFEX  ) hier $ccodes !n DFX NEXT
+( VAREX  ) hier $ccodes 02 +n !n HP PUSHPS NEXT
+( CONSEX ) hier $ccodes 04 +n !n HP PUSHPS AL cpLOAD NEXT
+
+code RUMPELSTILZCHEN NEXT 
+code RETEX PPC POPRS NEXT
+
+code $JEEX         ( P Index Limit        R - )
+( enter with limit and index on P stack )
+    JPPC           ( P Index Limit        R - ) 
+    PTOR           ( P Index              R Limit )
+    IDX            ( P Index Limit        R Limit )
+    P1 RCMP        ( P Index Limit        R Limit )
+( IF I<=L THEN )   (Limit-Index)
+    HI cBRbegin    ( P Index Limit        R Limit )
+        SWAP       ( P Limit Index        R Limit )
+        PTOR       ( P Limit              R Limit Index )
+        DEL        ( P                    R Limit Index )
+        JPPC       ( P                    R Limit Index )
+( exit with index and limit on R )
+    cBRelse
+        RTOP       ( P Index Limit Limit  R - )
+        DEL        ( P Index Limit        R - )
+        DEL        ( P Index              R - )
+        DEL        ( P -                  R - )
+        PPC PUSHPS ( P PPC                R - )
+        #2 uN ADD  ( P PPC+2              R - )
+        PPC POPPS  ( P -                  R - )
+( exit with stacks empty and PPC pointing to next word )
+    cBRend
+    NEXT
+
+code +LOOPEX       ( P Inc                R Limit Index )
+    RTOP           ( P Inc Index          R Limit       )
+    P1 ADD         ( P Index              R Limit )
+    IDX            ( P Index Limit        R Limit )
+    P1 RCMP        ( P Index Limit        R Limit )
+( IF I<=L THEN )
+    HI cBRbegin    ( P Index Limit        R Limit )
+        SWAP       ( P Limit Index        R Limit )
+        PTOR       ( P Limit              R Limit Index )
+        DEL        ( P                    R Limit Index )
+        JPPC       ( P                    R Limit Index )
+( exit with index and limit on R )
+    cBRelse
+        RTOP       ( P Index Limit Limit  R - )
+        DEL        ( P Index Limit        R - )
+        DEL        ( P Index              R - )
+        DEL        ( P -                  R - )
+        PPC PUSHPS ( P PPC                R - )
+        #2 uN ADD  ( P PPC+2              R - )
+        PPC POPPS  ( P -                  R - )
+( exit with stacks empty and PPC pointing to next word )
+    cBRend
+   NEXT
+
+code LOOPEX        ( P -                  R Limit Index )
+    RTOP           ( P Index              R Limit )
+    #01 uN ADD     ( P Index              R Limit )
+    IDX            ( P Index Limit        R Limit )
+    P1 RCMP        ( P Index Limit        R Limit )
+( IF I<=L THEN )
+    HI cBRbegin    ( P Index Limit        R Limit )
+        SWAP       ( P Limit Index        R Limit )
+        PTOR       ( P Limit              R Limit Index )
+        DEL        ( P                    R Limit Index )
+        JPPC       ( P                    R Limit Index )
+( exit with index and limit on R )
+    cBRelse
+        RTOP       ( P Index Limit Limit  R - )
+        DEL        ( P Index Limit        R - )
+        DEL        ( P Index              R - )
+        DEL        ( P -                  R - )
+        PPC PUSHPS ( P PPC                R - )
+        #2 uN ADD  ( P PPC+2              R - )
+        PPC POPPS  ( P -                  R - )
+( exit with stacks empty and PPC pointing to next word )
+    cBRend
+    NEXT
+
+code 2BLITERAL 2BLIT NEXT
+
+code BRONZ
+    #01 uN AND DEL NE cBRbegin 
+        JPPC 
+    cBRelse 
+        PPC PUSHPS    
+        #2 uN ADD 
+        PPC POPPS 
+    cBRend 
+    NEXT
+
+code @     AL cpLOAD  NEXT
+code @B    AL cpLOADB NEXT
+code !     AL cpSTORE NEXT
+code !B    AL cpSTORE NEXT
+code JUMP  JPPC       NEXT
+code +     P1 ADD     NEXT
+code -     P0 SUB     NEXT
+code NICHT CPL        NEXT
+code UND   P1 AND     NEXT
+code ODER  P1 OR      NEXT
+code EXO   P1 EOR     NEXT    
+code BIT   P0 MASK    NEXT
+code CHS   NEG        NEXT
+code WEG   DEL        NEXT
+code PWEG  DEL DEL    NEXT
+code DUP   DUPL       NEXT
+code PDUP  SOT SOT    NEXT
+code VERT  SWAP       NEXT
+code ZWO   SOT        NEXT
+code RDU   RTU        NEXT
+code RDO   RTD        NEXT
+code I     IDX        NEXT
+code S>R   PTOR       NEXT
+code R>S   RTOP       NEXT
+
+code =0  #0 sN CMP EQ FLAG NEXT
+code <0  #0 sN CMP LT FLAG NEXT
+code >0  #0 sN CMP GT FLAG NEXT
+code >=U    P0 SUB LS FLAG NEXT
+
+code F-VERGL     ( Field Compare, Unsigned, 1 to 256 bytes )
+                 ( P: n  a2 a1        R: )
+( assume fields are equal, set t=1 for initial comparison )
+    #1 uNLOAD    ( P: t  n  a2 a1     R: )
+    SWAP         ( P: n  t a2 a1      R: )
+
+( a: )
+    PTOR         ( P: t a2 a1         R: n )
+    PTOR         ( P: a2 a1           R: t n )
+    DUPL         ( P: a2 a2 a1        R: t n )
+    AL cpLOADB   ( P: <a2> a2 a1      R: t n )
+    RTD          ( P: a1 <a2> a2      R: t n )
+    DUPL         ( P: a1 a1 <a2> a2   R: t n )
+    AL cpLOADB   ( P: <a1> a1 <a2> a2 R: t n )
+    RTD          ( P: <a2> <a1> a1 a2 R: t n )
+    P0 SUB       ( P: dif a1 a2       R: t n )
+    DEL          ( P: a1 a2           R: t n )
+
+( if they are equal, skip further testing for this pair )
+( banch to label c: )
+    #0C EQ cBR   ( P: a1 a2           R: t n )
+
+( they are not equal, so t must be updated )
+    RTOP         ( P: t a1 a2         R: n )
+    DEL          ( P: a1 a2           R: n )
+    #0 uNLOAD    ( P: t a1 a2         R: n )
+
+( branch to label b: if a1<a2, else t=0 )
+    #02 CS cBR   ( P: t a1 a2         R: n )
+
+( a1>a2, t=2 )
+    #2 uN ADD    ( P: t a1 a2         R: n )
+    PTOR         ( P: a1 a2           R: t n )
+
+( c: equal or t updated )
+    #1 uNLOAD    ( P:  1 a1 a2        R: t n )
+    P1 ADD       ( P: a1+ a2          R: t n )
+    SWAP         ( P: a2  a1+         R: t n )
+    #1 uNLOAD    ( P:  1 a2 a1+       R: t n )
+    P1 ADD       ( P: a2+ a1+         R: t n )
+    RTOP         ( P: t a2+ a1+       R: n )    
+    RTOP         ( P: n t a2+ a1+     R: )
+    #1 uN SUB    ( P: n t a2+ a1+     R: )
+    #FF uN AND   ( P: n t a2+ a1+     R: )
+
+( branch to label a: if all elements not checked)
+    #CA NE cBR   ( P: n t a2+ a1+     R: )
+
+( done, clean up stack and exit )
+    DEL          ( P: t a2+ a1+       R: )
+    RTU          ( P: a2+ a1+ t       R: )
+    DEL          ( P: a1+ t           R: )
+    DEL          ( P: t               R: )
+
+    NEXT         ( P: t               R: )
+
+code SBIT
+    AL cpLOAD
+    SWAP
+    P0 MASK
+    P1 OR
+    NEXT
+
+code CBIT
+    AL cpLOAD
+    SWAP
+    P0 MASK
+    CPL
+    P1 AND
+    NEXT
+
+code TBIT
+    AL cpLOAD
+    SWAP
+    P0 MASK
+    P1 AND
+    NE FLAG
+    NEXT
+    
+code >>>        (Field Transport up to 256 bytes )
+                ( P: b ad as        R: )
+( a: )
+    PTOR        ( P: ad as          R: b )
+    DUPL        ( P: ad ad as       R: b )
+    RTD         ( P: as ad ad       R: b )
+    DUPL        ( P: as as ad ad    R: b )
+    AL cpLOADB  ( P: <as> as ad ad  R: b )
+    RTD         ( P: ad <as> as ad  R: b )
+    AL cpSTOREB ( P: as ad          R: b )
+    #1 uN ADD   ( P: as ad          R: b )
+    SWAP        ( P: ad as          R: b )
+    #1 uN ADD   ( P: ad as          R: b )
+    RTOP        ( P: b ad as        R: )
+    #1 uN SUB   ( P: b ad as        R: )
+    #FF uN AND  ( P: b ad as        R: )
+( branch to label a: )
+    #E4 NE cBR  ( P: b ad as        R: )
+    DEL         ( P: ad as          R: )
+    DEL         ( P: as             R: )
+    DEL         ( P:                R: )
+
+    NEXT
+
+code $TUE
+    HP POPPS
+    AL EXECUTE
+
+code $IPSETZEN
+    $$kbdip sSTORE
+    DEL
+    NEXT
+
+code $PSHOLEN        
+    PSC PUSHPS
+    NEXT
+
+( this routine assumes that it is to be used to clear or  )
+( reset the stack to empty, after a call to CLS or by an  )
+( underflow in the compiler. The overflow area is always  )
+( reset on each call, ... so take care using this routine )
+( for anything else!                                      )
+
+code $PSSETZEN   
+    PSC POPPS
+    #FEFE AL cNLOAD PSP POPPS                   ( Set PSP )
+    NEXT
+
+( 32-bit add )
+( expects the two values to be added to be present on the )
+( stack, high byte on top )
+( returns the 32-bit result, high byte on top )
+
+code P+        ( A + B )
+               ( P: Bh Bl Ah Al R: )
+    PTOR       ( P: Bl Ah Al    R: Bh )
+    RTD        ( P: Al Bl Ah    R: Bh )
+    P1 ADD     ( P: Cl Ah       R: Bh )
+    RTOP       ( P: Bh Cl Ah    R: )
+    RTD        ( P: Ah Bh Cl    R: )
+    P1 ADC     ( P: Ch Cl       R: )
+    NEXT
+
+( 32-bit subtract )
+( Expects the subtrahend on the top of the stack and the )
+( minuend below it )
+( The difference, minuend - subtrahend,  is returned on )
+( the top of the stack, high byte on top )
+
+code P-        ( A - B )
+               ( P: Bh Bl Ah Al R: )
+    PTOR       ( P: Bl Ah Al    R: Bh )
+    RTD        ( P: Al Bl Ah    R: Bh )
+    P0 SUB     ( P: Cl Ah       R: Bh )
+    RTOP       ( P: Bh Cl Ah    R: )
+    RTD        ( P: Ah Bh Cl    R: )
+    P0 SBC     ( P: Ch Cl       R: )
+    NEXT
+
+code P*        ( A * B )
+               ( P: Al Bl          R: )
+    PTOR       ( P: Bl             R: Al )
+    #0 uNLOAD  ( P: Bh Bl          R: Al )
+    DUPL       ( P: Cl Bh Bl       R: Al )
+    DUPL       ( P: Ch Cl Bh Bl    R: Al )
+( a: )
+    RTOP       ( P: Al Ch Cl Bh Bl R: )
+    #0 uN CMP  ( P: Al Ch Cl Bh Bl R: )
+    #2C EQ cBR  ( P: Al Ch Cl Bh Bl R: )
+    ( branch to label c: )
+
+    LSR        ( P: Al Ch Cl Bh Bl R: )
+    PTOR       ( P: Ch Cl Bh Bl    R: Al )
+    #14 CC cBR ( P: Ch Cl Bh Bl    R: Al )
+    ( branch to label b: )
+
+    PTOR       ( P: Cl Bh Bl       R: Ch Al )
+    PTOR       ( P: Bh Bl          R: Cl Ch Al )
+    SOT        ( P: Bl Bh Bl       R: Cl Ch Al )
+    SOT        ( P: Bh Bl Bh Bl    R: Cl Ch Al )
+    RTOP       ( P: Cl Bh Bl Bh Bl R: Ch Al )
+    RTD        ( P: Bl Cl Bh Bh Bl R: Ch Al )
+    P1 ADD     ( P: Cl Bh Bh Bl    R: Ch Al )
+    RTOP       ( P: Ch Cl Bh Bh Bl R: Al )
+    RTD        ( P: Bh Ch Cl Bh Bl R: Al )
+    P1 ADC     ( P: Ch Cl Bh Bl    R: Al )
+( b: )
+    PTOR       ( P: Cl Bh Bl       R: Ch Al )
+    PTOR       ( P: Bh Bl          R: Cl Ch Al )
+    SWAP       ( P: Bl Bh          R: Cl Ch Al )
+    LSL        ( P: Bl Bh          R: Cl Ch Al )
+    SWAP       ( P: Bh Bl          R: Cl Ch Al )
+    ROL        ( P: Bh Bl          R: Cl Ch Al )
+    RTOP       ( P: Cl Bh Bl       R: Ch Al )
+    RTOP       ( P: Ch Cl Bh Bl    R: Al )
+    #CE AL cBR ( P: Ch Cl Bh Bl    R: Al )
+    ( branch to label a: ) 
+( c: )
+    DEL        ( P: Ch Cl Bh Bl    R: )
+    PTOR       ( P: Cl Bh Bl       R: Ch )
+    PTOR       ( P: Bh Bl          R: Cl Ch )
+    DEL        ( P: Bl             R: Cl Ch )
+    DEL        ( P:                R: Cl Ch )
+    RTOP       ( P: Cl             R: Ch )
+    RTOP       ( P: Ch Cl          R: )
+
+    NEXT
+
+code P/MOD             ( P: D  Nh Nl                R: )
+( align divisor with quotient )
+    #0 uNLOAD       ( P: Dl Dh Nh Nl             R: )
+    SWAP            ( P: Dh Dl Nh Nl             R: )
+    SOT             ( P: pl Dh Dl Nh Nl          R: )
+( place marker )																	
+    #1 uNLOAD       ( P: ph pl Dh Dl Nh Nl       R: )
+( initialize quotient )
+    #0 uNLOAD       ( P: ql ph pl Dh Dl Nh Nl    R: )
+    DUPL            ( P: qh ql ph pl Dh Dl Nh Nl R: )
+    PTOR            ( P: ql ph pl Dh Dl Nh Nl R: qh )
+    PTOR            ( P: ph pl Dh Dl Nh Nl R: ql qh )
+    PTOR            ( P: pl Dh Dl Nh Nl R: ph ql qh )
+    PTOR            ( P: Dh Dl Nh Nl R: pl ph ql qh )
+( repeat: )
+( if N>=D )
+    RTD             ( P: Nh Dh Dl Nl R: pl ph ql qh )
+    P0 CMP          ( P: Nh Dh Dl Nl R: pl ph ql qh )
+( branch to qnupdate )
+    #0E HI cBR      ( P: Nh Dh Dl Nl R: pl ph ql qh )
+    #48 LO cBR      ( P: Nh Dh Dl Nl R: pl ph ql qh )
+    PTOR            ( P: Dh Dl Nl R: Nh pl ph ql qh )
+    PTOR            ( P: Dl Nl R: Dh Nh pl ph ql qh )
+    P1 RCMP         ( P: Dl Nl R: Dh Nh pl ph ql qh )
+    RTOP            ( P: Dh Dl Nl R: Nh pl ph ql qh )
+    RTOP            ( P: Nh Dh Dl Nl R: pl ph ql qh )
+    #3C LO cBR      ( P: Nh Dh Dl Nl R: pl ph ql qh )
+( branch to shift )
+( qnupdate: )
+    RTOP            ( P: pl Nh Dh Dl Nl R: ph ql qh )
+    DUPL            ( P: pl pl Nh Dh Dl Nl R: ph ql qh )
+    RTOP            ( P: ph pl pl Nh Dh Dl Nl R: ql qh )
+    SWAP            ( P: pl ph pl Nh Dh Dl Nl R: ql qh )
+    RTOP            ( P: ql pl ph pl Nh Dh Dl Nl R: qh )
+    P0 ADD          ( P: ql ph pl Nh Dh Dl Nl R: qh )
+    SWAP            ( P: ph ql pl Nh Dh Dl Nl R: qh )
+    DUPL            ( P: ph ph ql pl Nh Dh Dl Nl R: qh )
+    RTOP            ( P: qh ph ph ql pl Nh Dh Dl Nl R: )
+    P0 ADC          ( P: qh ph ql pl Nh Dh Dl Nl R: )
+    PTOR            ( P: ph ql pl Nh Dh Dl Nl R: qh )
+    SWAP            ( P: ql ph pl Nh Dh Dl Nl R: qh )
+    PTOR            ( P: ph pl Nh Dh Dl Nl R: ql qh )
+    PTOR            ( P: pl Nh Dh Dl Nl R: ph ql qh )
+    PTOR            ( P: Nh Dh Dl Nl R: pl ph ql qh )
+    RTU             ( P: Dh Dl Nh Nl R: pl ph ql qh )
+    SOT             ( P: Dl Dh Dl Nh Nl R: pl ph ql qh )
+    SOT             ( P: Dh Dl Dh Dl Nh Nl R: pl ph ql qh )
+    PTOR            ( P: Dl Dh Dl Nh Nl R: Dh pl ph ql qh )
+    PTOR            ( P: Dh Dl Nh Nl R: Dl Dh pl ph ql qh )
+    PTOR            ( P: Dl Nh Nl R: Dh Dl Dh pl ph ql qh )
+    RTD             ( P: Nl Dl Nh R: Dh Dl Dh pl ph ql qh )
+    P1 RSUB         ( P: Nl Nh R: Dh Dl Dh pl ph ql qh )
+    RTOP            ( P: Dh Nl Nh R: Dl Dh pl ph ql qh )
+    RTD             ( P: Nh Dh Nl R: Dl Dh pl ph ql qh )
+    P1 RSBC         ( P: Nh Nl R: Dl Dh pl ph ql qh )
+    RTOP            ( P: Dl Nh Nl R: Dh pl ph ql qh )
+    SWAP            ( P: Nh Dl Nl R: Dh pl ph ql qh )
+    RTOP            ( P: Dh Nh Dl Nl R: pl ph ql qh )
+    SWAP            ( P: Nh Dh Dl Nl R: pl ph ql qh )
+
+( shift: )
+    SWAP            ( P: Dh Nh Dl Nl R: pl ph ql qh )
+    LSR             ( P: Dh Nh Dl Nl R: pl ph ql qh )
+    RTD             ( P: Dl Dh Nh Nl R: pl ph ql qh )
+    ROR             ( P: Dl Dh Nh Nl R: pl ph ql qh )
+    SWAP            ( P: Dh Dl Nh Nl R: pl ph ql qh )
+    RTOP            ( P: pl Dh Dl Nh Nl R: ph ql qh )
+    RTOP            ( P: ph pl Dh Dl Nh Nl R: ql qh )
+    LSR             ( P: ph pl Dh Dl Nh Nl R: ql qh )
+    PTOR            ( P: pl Dh Dl Nh Nl R: ph ql qh )
+    ROR             ( P: pl Dh Dl Nh Nl R: ph ql qh )
+( done? branch to chkerr )
+    #04 EQ cBR      ( P: pl Dh Dl Nh Nl R: ph ql qh )
+    PTOR            ( P: Dh Dl Nh Nl R: pl ph ql qh )
+( not done - branch to repeat )
+    #96 AL cBR      ( P: Dh Dl Nh Nl R: pl ph ql qh )
+
+( chkerr: )
+    DEL             ( P: Dh Dl Nh Nl R: ph ql qh )
+    DEL             ( P: Dl Nh Nl R: ph ql qh )
+    DEL             ( P: Nh Nl R: ph ql qh )
+    RTOP            ( P: ph Nh Nl R: ql qh )
+    DEL             ( P: Nh Nl R: ql qh )
+    RTOP            ( P: ql Nh Nl R: qh )
+    RTOP            ( P: qh ql Nh Nl R: )
+    #0 uN RSUB      ( P: qh ql Nh Nl R: )
+    DEL             ( P: ql Nh Nl R: )
+( branch to error )
+    #0A NE cBR      ( P: ql Nh Nl R: )          
+( OK: )
+    SWAP            ( P: Nh ql Nl R: )
+    DEL             ( P: ql Nl R: )
+    SWAP            ( P: Nl ql R: )
+
+    NEXT            ( P: rem quo )
+
+( error: )
+    DEL             ( P: Nh Nl R: ) 
+    DEL             ( P: Nl R: )
+    DEL             ( P: R: )
+    #FF sNLOAD      ( P: quo )
+    #0 uNLOAD       ( P: rem quo )
+
+    NEXT            ( P: rem quo )
+
+code $POLYNAME ( P: ch       0.C     B.A          R: )
+
+    PTOR       ( P: 0.C      B.A                  R: ch )
+    SWAP       ( P: B.A      0.C                  R: ch )
+    DUPL       ( P: B.A      B.A     0.C          R: ch )
+    #FF uN AND ( P: 0.A      B.A     0.C          R: ch )
+    RTU        ( P: B.A      0.C     0.A          R: ch )
+    XB         ( P: A.B      0.C     0.A          R: ch )
+    #FF uN AND ( P: 0.B      0.C     0.A          R: ch )
+    XB         ( P: B.0      0.C     0.A          R: ch )
+    P1 OR      ( P: B.C      0.A                  R: ch )
+    SWAP       ( P: 0.A      B.C                  R: ch )
+    SOT        ( P: B.C      0.A     B.C          R: ch )
+    DUPL       ( P: B.C      B.C     0.A B.C      R: ch )
+    LSR        ( P: B>1.C>1  B.C     0.A B.C      R: ch )
+    DUPL       ( P: B>1.C>1  B>1.C>1 B.C 0.A B.C  R: ch )
+    LSR        ( P: B>2.C>2  B>1.C>1 B.C 0.A B.C  R: ch )
+    P1 EOR     ( P: BxC B.C  0.A     B.C          R: ch )
+    P1 EOR     ( P: BxC 0.A  B.C                  R: ch )
+    PTOR       ( P: 0.A B.C                       R: BxC ch )
+    SOT        ( P: B.C 0.A  B.C                  R: BxC ch )
+    SOT        ( P: 0.A B.C  0.A     B.C          R: BxC ch )
+    SWAP       ( P: B.C 0.A  0.A     B.C          R: BxC ch )
+    LSL        ( P: B<1.C<1  0.A 0.A B.C          R: BxC ch )
+    SWAP       ( P: 0.A      B<1.C<1 0.A B.C      R: BxC ch )
+    ROL        ( P: 0<1.A<1  B<1.C<1 0.A B.C      R: BxC ch )
+    #FF uN AND ( P: 0.A<1    B<1.C<1 0.A B.C      R: BxC ch )
+    XB         ( P: A.0<1    B<1.C<1 0.A B.C      R: BxC ch )
+    SWAP       ( P: B<1.C<1  A.0<1   0.A B.C      R: BxC ch )
+    XB         ( P: C<1.B<1  A.0<1   0.A B.C      R: BxC ch )
+    #FF uN AND ( P: 0.B<1    A.0<1   0.A B.C      R: BxC ch )
+    P1 OR      ( P: A<1.B<1  0.A     B.C          R: BxC ch )
+    RTOP       ( P: BxC      A<1.B<1 0.A B.C      R: ch )
+    P1 EOR     ( P: BxC      0.A     B.C          R: ch )
+    RTOP       ( P: ch       BxC     0.A B.C      R: )
+    #FF uN AND ( P: ch       BxC     0.A B.C      R: )
+    P1 EOR     ( P: BxC      0.A     B.C          R: )
+    #FF uN AND ( P: 0.xC     0.A     B.C          R: )
+    XB         ( P: xC.0     0.A     B.C          R: )
+    P1 OR      ( P: xC.A     B.C                  R: )
+    SWAP       ( P: B.C      xC.A                 R: )
+    LSL        ( P: B<1.C<1  xC.A                 R: )
+    SWAP       ( P: xC.A     B<1.C<1              R: )
+    ROL        ( P: xC<1.A<1 B<1.C<1              R: )
+    XB         ( P: A<1.xC<1 B<1.C<1              R: )
+    SWAP       ( P: B<1.C<1  A<1.xC<1             R: )
+    XB         ( P: C<1.B<1  A<1.xC<1             R: )
+    #FF uN AND ( P: 0.B<1    A<1.xC<1             R: )
+
+    NEXT
+
+code CYC2           ( P: 0.ch A.B        R: )
+    #FF uN AND      ( P: 0.ch A.B        R: )
+    XB              ( P: ch.0 A.B        R: )
+    SWAP            ( P: A.B  ch.0       R: )
+    XB              ( P: B.A  ch.0       R: )
+    #8 uNLOAD       ( P: cnt B.A  ch.0   R: )
+
+( a: LOOP )
+    PTOR            ( P: B.A  ch.0       R: cnt )
+    SOT             ( P: ch.0 B.A  ch.0  R: cnt )
+    P1 EOR          ( P: cXba ch.0       R: cnt )
+( set flag if MSB 1 )
+    MI FLAG         ( P: 0|1  cXba ch.0  R: cnt )
+    PTOR            ( P: cXba ch.0       R: 0|1 cnt )
+    LSL             ( P: cXba ch.0       R: 0|1 cnt )
+    SWAP            ( P: ch.0 cXba       R: 0|1 cnt )
+    LSL             ( P: ch.0 cXba       R: 0|1 cnt )
+    SWAP            ( P: cXba ch.0       R: 0|1 cnt )
+    RTOP            ( P: 0|1  cXba ch.0  R: cnt )
+    #1 uN AND       ( P: 0|1  cXba ch.0  R: cnt )
+    DEL             ( P: cXba ch.0       R: cnt )
+
+( branch to label b if MSB 0 )
+    #6 EQ cBR       ( P: cXba ch.0       R: cnt )
+    #1021 AL cNLOAD ( P: 1021 cXba ch.0  R: cnt )
+    P1 EOR          ( P: cXba ch.0       R: cnt )
+
+( b: test LOOP CNT to see if we are done)
+    RTOP            ( P: cnt cXba ch.0   R: )
+    #1 uN SUB       ( P: cnt cXba ch.0   R: )
+
+( repeat loop if cnt <> 0 )
+    #DA NE cBR      ( P: cnt cXba ch.0   R: )
+
+( tidy up and return result in correct byte order )
+    RTU             ( P: ch.0 cnt cXba   R: )
+    DEL             ( P: cnt cXba        R: )
+    DEL             ( P: cXba            R: )
+    XB              ( P: A.B             R: )
+
+    NEXT            ( P: A.B             R: )
+
+code TR-LOOP                           ( not required for now )
+( ** TODO ** )
+    NEXT
+
+code RP-LOOP                           ( not required for now )
+( ** TODO ** )
+    NEXT
+
+code 3V3  ( P: A B C D E F   R: )      
+    PTOR  ( P: B C D E F     R: A )
+    RTD   ( P: D B C E F     R: A )
+    XRP   ( P: A B C E F     R: D )
+    PTOR  ( P: B C E F       R: A D )
+    RTD   ( P: E B C F       R: A D )
+    XRP   ( P: A B C F       R: E D )
+    PTOR  ( P: B C F         R: A E D )
+    RTD   ( P: F B C         R: A E D )
+    XRP   ( P: A B C         R: F E D )
+    RTOP  ( P: F A B C       R: E D )
+    RTOP  ( P: E F A B C     R: D )
+    RTOP  ( P: D E F A B C   R: )
+
+    NEXT
+
+(                        IPS-F1G                              ) 
+(                        -------                              ) 
+
+#0518  kon  UHR
+#051E  kon  SU0
+#0522  kon  SU1
+#0526  kon  SU2
+#052A  kon  SU3
+#0502  kon  KETTE
+
+0 kon 0   1 kon 1   2 kon 2   4 kon 4 
+'n 2BLITERAL #0 'n BRONZ 'n JUMP 'n $JEEX  'n LOOPEX
+'n +LOOPEX   'n RETEX  $ccodes 6 +n 8 !fk
+
+(                   IPS general definitions                   )
+
+:n >    - >0   ;n                :n <>    - =0 NICHT      ;n
+:n =    - =0   ;n                :n >=    - <0 NICHT      ;n
+:n <    - <0   ;n                :n <=    - >0 NICHT      ;n
+                                 :n <>0     =0 NICHT      ;n
+:n *       P* WEG ;n             :n P/     P/MOD WEG      ;n
+:n /MOD  #0 VERT P/MOD ;n        :n /       /MOD WEG      ;n
+:n MOD  /MOD VERT WEG ;n         :n +! DUP @ RDO + VERT ! ;n
+
+(                     Compiler constants                      )
+
+#02C0  kon  SYSLINE              ( Posn.  buffer for messages )
+#052E  kon  READYFLAG        ( Compiler free to process input )
+#052F  kon  LOADFLAG                 ( Input coming from file )
+#0530  kon  $PE                     ( Pointer to end of input )
+#0532  kon  $PI                   (     Compiler read pointer )
+#0534  kon  $P1                   ( Compiler parsing position )
+#0536  kon  $P2                   ( End of block reached flag )
+#0538  kon  $P3                     ( Link pointer for $SUCH  )
+#053A  kon  $H                   ( Pointer to memory position )
+
+#0004  kon  $SL                                 ( Stack limit )
+#FF00  kon  $ML                            ( Memory limit 64K )
+
+#0000  kon  $LL                                  ( End of IPS )
+
+#0100  kon  TV0               ( 1st   TV screen line position )
+#0200  kon  TV4               ( 4th   TV screen line position )
+#0300  kon  TV8               ( 8th   TV screen line position )
+#0100  kon  $TVS              ( Stack TV screen line position )
+#04FF  kon  $TVE              ( Last  TV screen line position )
+
+$ccodes @n kon DEFEX
+$ccodes @n 02 +n kon VAREX
+$ccodes @n 04 +n kon CONSEX
+
+(                        The Compiler                         )
+(                        ------------                         )
+
+#0004 feld $ND
+#0001 var $RS
+#0000 var $F1
+#0000 var $F2
+#0000 var $KK
+#0000 var BASIS
+#0000 var BEM
+#0001 var BEA
+#0000 var EINGABEZAHL
+#0000 var Z-LESEN
+#0000 var COMPILEFLAG
+#0000 var $V1
+#0000 var LINK
+
+(                       Error messages                        )
+(                       --------------                        )
+
+(  Default language     Alternative language                  )
+
+16 feld STACKMESSAGE    16 feld L-STACKMESSAGE
+16 feld MEMMESSAGE      16 feld L-MEMMESSAGE
+16 feld NAMEMESSAGE     16 feld L-NAMEMESSAGE
+16 feld STRUCMESSAGE    16 feld L-STRUCMESSAGE
+16 feld TEXTMESSAGE     16 feld L-TEXTMESSAGE
+16 feld RSMESSAGE       16 feld L-RSMESSAGE
+
+~ SPEICHER VOLL !  ~   'n MEMMESSAGE       02 +n $OC !t
+~ MEMORY FULL !    ~   'n L-MEMMESSAGE     02 +n $OC !t
+~ NAME FEHLT !     ~   'n NAMEMESSAGE      02 +n $OC !t
+~ NAME MISSING !   ~   'n L-NAMEMESSAGE    02 +n $OC !t
+~ STAPEL LEER !    ~   'n STACKMESSAGE     02 +n $OC !t
+~ STACK EMPTY !    ~   'n L-STACKMESSAGE   02 +n $OC !t
+~ STRUKTURFEHLER ! ~   'n STRUCMESSAGE     02 +n $OC !t
+~ STRUCTURE ERROR! ~   'n L-STRUCMESSAGE   02 +n $OC !t
+~ TEXTFEHLER !     ~   'n TEXTMESSAGE      02 +n $OC !t
+~ TEXT-ERROR !     ~   'n L-TEXTMESSAGE    02 +n $OC !t
+~ UNZUL. NAME !    ~   'n RSMESSAGE        02 +n $OC !t
+~ DUPLICATE NAME ! ~   'n L-RSMESSAGE      02 +n $OC !t
+
+(                   Compiler definitions                      )
+(                   --------------------                      )
+
+:n INCR  DUP @ 1 + VERT ! ;n
+
+:n HIER  $H @ ;n
+
+:n H2INC HIER 2 + $H ! ;n
+
+:n $DEP  HIER ! H2INC ;n
+
+:n $CEN  DUP $IPSETZEN DUP @B #80 ODER ZWO !B
+         $PI ! $TVE $PE ! 0 READYFLAG !B ;n
+
+:n IE    $P1 @ DUP $PI @ 1 - je I @B #80 EXO I !B
+         nun $CEN WEG ;n
+
+#0 kon $LANG                       ( Messages language switch )
+
+:n SYSWRITE $LANG + SYSLINE 16 >>> 0 IE ;n
+
+:n L>>> anfang DUP 256   > ja? 256 - S>R PDUP 256 >>>
+                               256 + VERT 256 + VERT R>S
+        dann/nochmal DUP >0 ja?  >>>
+                            nein: PWEG WEG
+                            dann ;n
+
+( :n $SUCH  LINK @ $P3 ! $SCODE ;n )
+
+:n $SUCH  LINK @ 
+   anfang  DUP @B #3F UND $ND @B = ZWO 1 + $ND 1 + 
+   3 F-VERGL UND NICHT 
+   ja?  ( NICHT GEF. )  4 + @ 
+      DUP =0 ja?  ( LISTENENDE )  RETEX 
+             dann 
+   dann/nochmal 6 + ;n 
+
+#0 var CFLAG ( Comment Flag )
+
+:n $CSCAN 0 $PI @ $PE @
+   je WEG 1 I @B #20 EXO >0
+     ja? I @B CFLAG @B ja? #29 ( KL. ZU ) =
+                           ja? 0 CFLAG !B
+                           dann
+                       nein: #28 ( KL. AUF ) =
+                             ja? 1 CFLAG !B
+                             nein: WEG 2
+                             dann
+                       dann
+     dann VERT ZWO = ja? 0
+                     nein: R>S $PI ! I S>R
+                     dann
+   nun DUP =0 ja? $PE @ 1 + $PI ! VERT WEG 1 $P2 !
+              dann ;n 
+
+:n $NAME   0   READYFLAG @B 0 $P2 !
+       ja? 1 $CSCAN >0
+          ja? $PI @ $P1 !
+              2 $CSCAN PWEG #CE57 #8D
+              $P1 @ $PI @ ZWO - DUP 63 > ja? WEG 63
+                                         dann
+              DUP $ND !B 1 - ZWO +
+              je I @B $POLYNAME
+              nun $ND 3 + !B $ND 1 + ! 1
+          dann
+       dann ;n
+
+:n $ZAHL 1 ( OK ) 0 ( ANF. ) $PI @ 1 - $P1 @
+  #2D ZWO @B = ja?    1 +  -1 S>R ( NEG ) 10 ( BASIS )
+               nein:        1 S>R ( POS )
+                    #23 ZWO @B =
+                    ja?   1 +             16
+                    nein: #42 ZWO @B =
+                          ja?    1 +       2
+                          nein:           10
+               dann dann  dann   BASIS !
+ VERT je BASIS @ * I @B DUP #3A < ja? #30 -
+                                  dann
+                        DUP #40 > ja? #37 -
+                                  dann
+         DUP BASIS @ >= ZWO <0 ODER ja? ( FEHLER ) WEG 0 RDU
+                                    dann +
+      nun R>S * VERT ;n
+
+
+:n COMPILER  $NAME
+ja? $SUCH
+    1   ( FUER WEITER ) BEM @B
+        ja? ZWO 'n RUMPELSTILZCHEN
+                = ja?   ( RUMP. ) 0 BEM !
+                  nein: ( NICHT RUMP. ) Z-LESEN @
+                       ja?   PWEG 0 1
+                       nein: ZWO BEA @ <
+                             ja? IE WEG 0
+                             dann
+                       dann
+                  dann
+        dann
+   ja?  ( WEITERFLAG ? )  DUP =0
+        ja? ( NUMBERPROCESSOR )
+         WEG $ZAHL
+
+          ja?  COMPILEFLAG @B
+            ja?  
+               'n 2BLITERAL $DEP $DEP
+            nein: BEM @B ja? EINGABEZAHL ! 0 Z-LESEN !
+                         dann
+            dann
+          nein: IE
+          dann
+      nein: ( FOUNDPROCESSOR ) DUP 6 - @B #C0 UND
+            COMPILEFLAG @B ODER
+            DUP 1 =
+            ja?   WEG HIER $ML >=U ja?  WEG MEMMESSAGE SYSWRITE
+                                  nein: $DEP
+                                  dann
+            nein: DUP #80 = VERT #C1 = ODER
+                  ja?    IE
+                  nein: R>S $V1 ! $TUE $V1 @ S>R
+                  dann
+            dann
+      dann
+
+( this part has been changed to accomodate the Am1601 PSC/PSP  )
+( way of doing things. To avoid an Am1601 exception the stack  )
+( is loaded with 4 junk items on Reset. $SL is initialized to  )
+( #0004. Stack underflow is indicated by $PSHOLEN returning a  )
+( value below this                                             )
+
+      $PSHOLEN $SL < ja? $SL $PSSETZEN STACKMESSAGE SYSWRITE
+                       WEG $F1
+                   dann
+   dann
+dann READYFLAG @B $P2 @B UND
+   ja?  #20 TV8 !B 
+        TV8 DUP 1 + $PI @ TV8 - 1 - L>>>  
+
+  TV8 $CEN 
+   dann  ;n
+
+(                   Compiler Auxiliary routines                )
+(                   ---------------------------                )
+
+:n ENTRYSETUP 
+       HIER #0001 UND <>0 ja?
+           HIER 1 + $h !
+       dann 
+       $F1 $KK ! $NAME DUP
+       ja?   $SUCH =0 NICHT $RS @ UND
+             ja?   RSMESSAGE SYSWRITE WEG  0
+             nein: HIER DUP $KK ! LINK @ H2INC H2INC
+                   $DEP $ND ZWO 4 >>> LINK ! HIER VERT H2INC
+             dann
+       nein: NAMEMESSAGE SYSWRITE
+       dann ;n
+
+:n $GETADR $NAME ja?   $SUCH DUP =0
+                             ja?   IE      0
+                             nein:         1
+                             dann
+                nein: NAMEMESSAGE SYSWRITE 0
+                dann ;n
+:hpri  '     $GETADR ja? COMPILEFLAG @
+                        ja? 'n 2BLITERAL $DEP $DEP
+                        dann
+                    dann ;n
+
+:prior  ;     'n RETEX $DEP  0 COMPILEFLAG !B
+         $F2 <>
+         ja? STRUCMESSAGE $LANG  + SYSLINE #20 + 16 >>>
+             LINK @ DUP $H ! 4 + @ LINK !      0 IE
+         dann ;n
+
+:int  :   ENTRYSETUP ja? DEFEX VERT ! 1 COMPILEFLAG !B $F2
+                    dann ;n
+:n PRIMODIFY   $KK @ @B ODER $KK @ !B ;n
+
+:int :PRIOR  i> 'n  : $dep <i      #80 PRIMODIFY ;n
+:int :HPRI   i> 'n  : $dep <i      #40 PRIMODIFY ;n
+:int :INT    i> 'n  : $dep <i      #C0 PRIMODIFY ;n
+
+:prior JA? 'n BRONZ $DEP HIER H2INC ;n
+:prior DANN  HIER VERT ! ;n
+:prior NEIN: 'n JUMP $DEP HIER H2INC VERT i> 'n DANN $dep <i ;n
+:prior JE    'n $JEEX $DEP HIER H2INC ;n
+:prior NUN   'n LOOPEX  $DEP DUP i> 'n DANN $dep <i 2 + $DEP ;n
+:prior +NUN  'n +LOOPEX $DEP DUP i> 'n DANN $dep <i 2 + $DEP ;n
+:prior ANFANG HIER ;n
+:prior ENDE? 'n BRONZ $DEP $DEP ;n
+:prior DANN/NOCHMAL VERT 'n JUMP $DEP $DEP i> 'n DANN $dep <i ;n
+
+:int KON        ENTRYSETUP ja? CONSEX VERT ! $DEP
+                           dann ;n
+:int VAR        ENTRYSETUP ja? VAREX  VERT ! $DEP
+                           dann ;n
+:int FELD       ENTRYSETUP ja? VAREX  VERT ! HIER + $H !
+                           dann ;n
+
+   'n TV4 02 +n $OC @n var SP               (  Screen Pointer )
+:n !CHAR  SP @ !B SP INCR ;n
+:n TLITERAL  I 1 + R>S @B PDUP + S>R SP @ PDUP + SP !
+            VERT >>> ;n
+:hpri " $PI INCR $PI @ 0 ZWO DUP 257 + DUP $TVE >
+                                        ja? WEG $TVE dann
+        je $PI @ @B #22 =
+           ja?
+           R>S PWEG 1 I S>R
+           dann  $PI INCR
+        nun
+        ZWO $PI @ 2 - VERT - DUP >0 RDO UND
+        ja?  COMPILEFLAG @
+             ja?
+               S>R I  'n TLITERAL $DEP HIER !B
+               $H INCR HIER I >>> HIER  R>S + $H !
+             dann
+        nein:   TEXTMESSAGE SYSWRITE VERT WEG
+        dann   ;n
+
+:int !T  VERT  >>>  ;n
+
+:n LEERZ  S>R SP @ #20 ZWO !B DUP 1 + R>S 1 - L>>> ;n
+
+:int OK   SP @ SYSLINE SP !  #40 LEERZ  SP !  ;n
+
+:n !FK    S>R I 2 * + 1 R>S je 2 - DUP S>R ! R>S
+                           nun WEG ;n
+
+:n WAND BASIS @ 10 = ja?   DUP ( ZAHL ) <0
+                          ja? CHS #2D ( - ) !CHAR
+                          dann 10000 0 ( W.-ANFANG )
+                    nein: 16 BASIS ! #23 ( # ) !CHAR
+                          #1000 1 ( W.-ANFANG )
+                    dann  S>R
+   anfang VERT ZWO /MOD VERT
+            I NICHT ja?  DUP >0 ja? R>S WEG 1 S>R
+                    dann        dann
+                  I ja?  DUP  #30 + DUP #39 >
+                                    ja? 7 +
+                                    dann !CHAR
+                    dann
+                    WEG VERT BASIS @ / DUP =0
+   ende? PWEG R>S NICHT ja? #30 !CHAR
+                        dann ;n
+
+
+:n $INSERT  VERT  #7  UND    2  *  KETTE  +  !  ;n
+
+:n $CHAINACT  COMPILEFLAG  @
+             ja?    'n  2BLITERAL  $DEP  $DEP
+                    'n  $INSERT    $DEP
+             nein:  ZWO  #FFF8  UND            ( mask for 0-7 )
+                    =0  ja?    $INSERT
+                        nein:  IE
+                        dann
+             dann  ;n
+
+:hpri AUSH   'n  RUMPELSTILZCHEN  $CHAINACT  ;n 
+:hpri EINH   $GETADR  ja?  $CHAINACT
+                      dann ;n
+
+32 feld STACKBUF      ( Temporary Storage for Parameter Stack )
+#0 var SCOUNT
+
+:n ZEIG-STAPEL
+   $P2 @ ja?                          ( End of block reached? )
+       SP @    
+       S>R                          ( Save SP on return stack )
+       $TVS SP ! #80 LEERZ              ( Blank Stack Display )
+       $PSHOLEN $SL -                         ( Get # entries )
+       DUP 16 > ja? 
+          WEG 16                       ( Max of 16 to display )
+       dann  
+       DUP >0 ja? 
+            #1 - DUP SCOUNT ! 
+            00 VERT je               ( copy p-stack to memory )
+                I DUP + STACKBUF + ! 
+            nun  
+            SCOUNT @ #1 + S>R 
+            anfang R>S DUP >0 ja? 
+               1 - DUP S>R 
+               DUP + STACKBUF + @ 
+               DUP $TVS SCOUNT @ I - 8 * + SP ! WAND 
+            dann/nochmal 
+            WEG 
+        nein: 
+           WEG                                ( discard count )
+        dann 
+        R>S SP !                                 ( restore SP )
+   dann 
+;n
+
+:int ?  $GETADR  ja? 2 +
+                 dann  ;n
+
+:n SCHREIB    S>R SP @ I >>> SP @ R>S + SP ! ;n
+
+:int WEG/AB
+   $GETADR  ja?  DUP  $LL  VERT  >=U
+                 ja?    IE
+                 nein:  2  -  DUP  @  LINK  !  4  -  $H  !
+                 dann
+           dann  ;n
+
+(                       End IPS-F1G                           )
+
+(                 Utilities and extensions                    )
+(                 ------------------------                    )
+
+:int AWEG $SL $PSSETZEN ;n                     (  Clear Stack )
+
+:n LANG <>0  ja?    L-STACKMESSAGE  STACKMESSAGE  -
+             nein:  0
+             dann  'n $LANG 2 + !  ;n
+
+:n S-ON i> 'n 0           $dep  'n 2BLITERAL $dep
+           'n ZEIG-STAPEL $dep  'n $INSERT   $dep <i ;n
+
+
+(                Build the rest of SYSPAGE etc                )
+(                -----------------------------                )
+
+'n COMPILER                                (  Construct chain )
+'n ZEIG-STAPEL 
+'n RUMPELSTILZCHEN dup dup dup dup dup dup
+'n JUMP #0500 #0500 $OC 11 !fk
+
+             hier 'n $LL #2 +n !O                   ( Set $LL )
+      hier 'n $H  #2 +n $OC @n !O                    ( Set $H )
+     $$tv8 'n $PI #2 +n $OC @n !O            ( Initialise $PI )
+           'n $ND #2 +n  #053E !O        ( Pointer for $SCODE )
+$ccodes 22 +n @n 'n LINK #2 +n !O                  ( Set LINK )
+
+               $$tv8 $$kbdip $OC !n            ( INPUTPOINTER )
+               $$tve $$pe $OC !n
+               #0 $$inson $OC !b             ( Insert Flag ON )
+               #A0 $$tv8 $OC !b         ( Initial Blob Cursor )
+               #0 $$readyflag $OC !b    
+
+               ( End of metacompilation )
+
+
+(         Save IPS-F1G binary image; compilation off          )
+(         ------------------------------------------          )
+
+#0000 $OC hier $OC ~ IPS-F1G.BIN ~  $save  <X
+~    IPS-F1G compiled OK    ~ #01D5 !t          ( info splash )
+

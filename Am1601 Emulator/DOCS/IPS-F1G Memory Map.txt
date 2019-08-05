@@ -1,0 +1,68 @@
+IPS-F1G Memory Map
+------------------
+
+#0000 Reset Vector
+#0004 Return Stack Underflow Vector
+#0008 Parameter Stack Underflow Vector
+#000C PC Odd Vector
+#0010 Maskable Interrupt Vector
+
+#0100 Screen
+#0500 Syspage
+
+Syspage assignments 500-57F
+---------------------------
+
+ 500  ' COMPILER                      520  SU0 Minutes LSW
+ 501                                  521  SU0 Minutes MSW
+ 502  0 ' ZEIG-STAPEL (KETTE)         522  SU1 10ms    (0-98)
+ 503                                  523  SU1 Seconds (0-59)
+ 504  1                               524  SU1 Minutes LSW
+ 505                                  525  SU1 Minutes MSW
+ 506  2                               526  SU2 10ms    (0-98)
+ 507                                  527  SU2 Seconds (0-59)
+ 508  3                               528  SU2 Minutes LSW
+ 509                                  529  SU2 Minutes MSW
+ 50A  4                               52A  SU3 10ms    (0-98)
+ 50B                                  52B  SU3 Seconds (0-59)
+ 50C  5                               52C  SU3 Minutes LSW
+ 50D                                  52D  SU3 Minutes MSW
+ 50E  6                               52E  READYFLAG
+ 50F                                  52F  LOADFLAG
+ 510  7                               530  $PE value
+ 511                                  531  
+ 512  JUMP                            532  $PI value
+ 513                                  533  
+ 514  #0500                           534  $P1 value
+ 515                                  535  
+ 516  --                              536  $P2 value
+ 517  --                              537  
+ 518  UHR 10ms    (0-98)              538  $P3 value
+ 519  UHR Seconds (0-59)              539  
+ 51A  UHR Minutes (0-59)              53A  $H  value
+ 51B  UHR Hours   (0-23)              53B  
+ 51C  UHR Days LSW                    53C  $Os value
+ 51D  UHR Days MSW                    53D  
+ 51E  SU0 10ms    (0-98)              53E  $ND value
+ 51F  SU0 Seconds (0-59)              53F
+
+#0540 - #054F reserved for 20ms use
+
+ 540 Keyboard Input Pointer
+ 541 "
+ 542 Insert Flag
+
+#0600 Reset Service Routine
+
+#0650 20ms Service Routine
+
+#FEFE Parameter Stack Overflow Start
+#FFFE Return Stack Overflow Start
+
+I/O Space Map
+-------------
+
+#0000 Keypressed Input Port / Reset Flag Output Port
+#0002 Key Value Input Port
+
+October 28, 2002 - Paul Willmott, VP9MU

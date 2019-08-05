@@ -1,0 +1,155 @@
+object frmMain: TfrmMain
+  Left = 219
+  Top = 166
+  Width = 670
+  Height = 308
+  HorzScrollBar.Range = 666
+  Anchors = [akLeft, akTop, akRight, akBottom]
+  BorderIcons = [biSystemMenu, biMinimize]
+  BorderStyle = fbsSingle
+  Caption = ' Am1601 Emulator'
+  Color = clBackground
+  Icon.Data = {
+    0000010001002020100000000000E80200001600000028000000200000004000
+    0000010004000000000080020000000000000000000000000000000000000000
+    000000008000008000000080800080000000800080008080000080808000C0C0
+    C0000000FF0000FF000000FFFF00FF000000FF00FF00FFFF0000FFFFFF000000
+    000000000000330077000000000000000000000000003B077070000000000000
+    000000000000BB807007000000000000000000000300B0007000700000000000
+    00000000330070070700070000000000000000003B0700700070007000000000
+    00000000BB800700000700070000000000000300B00070000000700070000000
+    0000330070070000000007000700000000003B07007000000000007007000000
+    0000BB800700000000000007070000000300B000700000000070000077000000
+    330070070000000007000000803300003B070070000000000000000800330000
+    BB8007000000000000000080BBBB0300B000700000000070000008000BB03300
+    70070000000707000000803300003B070070000000707000000800330000BB80
+    07000000070700000080BBBB0000B000700000000070000008000BB000007007
+    0000000007000000803300000000707000007770000000080033000000008700
+    0007070700000080BBBB00000000080000077777000008000BB0000000000080
+    0007070700008033000000000000000800007770000800330000000000000000
+    800000000080BBBB00000000000000000800000008000BB00000000000000000
+    0080000080330000000000000000000000080008003300000000000000000000
+    00008080BBBB00000000000000000000000008000BB00000000000000000FFFF
+    33FFFFFF21FFFFFF00FFFFFB007FFFF3003FFFF2001FFFF0000FFFB00007FF30
+    0003FF200003FF000003FB000003F3000000F2000000F0000010B00000393000
+    000F2000000F0000010F0000039F000000FF000000FF000010FF800039FFC000
+    0FFFE0000FFFF0010FFFF8039FFFFC00FFFFFE00FFFFFF10FFFFFFB9FFFF}
+  Menu = mnuMain
+  Position = poDefault
+  OnActivate = FormActivate
+  OnClose = FormClose
+  OnCreate = FormCreate
+  OnKeyUp = FormKeyUp
+  PixelsPerInch = 96
+  TextHeight = 13
+  TextWidth = 6
+  object pnlIPSScreen: TPanel
+    Left = 8
+    Top = 0
+    Width = 658
+    Height = 280
+    Anchors = [akLeft, akTop, akBottom]
+    TabOrder = 0
+    object imgIPSScreen: TImage
+      Left = 8
+      Top = 12
+      Width = 642
+      Height = 258
+      Anchors = [akLeft, akTop, akBottom]
+    end
+  end
+  object mnuMain: TMainMenu
+    Left = 576
+    Top = 16
+    object mnuFile: TMenuItem
+      Caption = '&File'
+      object mnuLoad: TMenuItem
+        Caption = '&Load'
+        OnClick = mnuLoadClick
+      end
+      object mnuSave: TMenuItem
+        Caption = '&Save'
+        OnClick = mnuSaveClick
+      end
+      object N1: TMenuItem
+        Caption = '-'
+      end
+      object mnuExit: TMenuItem
+        Caption = 'E&xit'
+        OnClick = mnuExitClick
+      end
+    end
+    object mnuView: TMenuItem
+      Caption = '&View'
+      object mnuRegisterView: TMenuItem
+        Caption = '&Register View'
+        Checked = True
+        OnClick = mnuRegisterViewClick
+      end
+      object mnuMemoryView: TMenuItem
+        Caption = 'Memory View &A'
+        Checked = True
+        OnClick = mnuMemoryViewClick
+      end
+      object mnuMemoryViewB: TMenuItem
+        Caption = 'Memory View &B'
+        Checked = True
+        OnClick = mnuMemoryViewBClick
+      end
+      object mnuMemoryViewC: TMenuItem
+        Caption = 'Memory View &C'
+        Checked = True
+        OnClick = mnuMemoryViewCClick
+      end
+      object mnuMemoryViewD: TMenuItem
+        Caption = 'Memory View &D'
+        Checked = True
+        OnClick = mnuMemoryViewDClick
+      end
+      object mnuInputPortView: TMenuItem
+        Caption = '&Input Port View'
+        Checked = True
+      end
+      object mnuOutputPortView: TMenuItem
+        Caption = '&Output Port View'
+        Checked = True
+      end
+    end
+    object mnuRun: TMenuItem
+      Caption = '&Run'
+      object mnuStart: TMenuItem
+        Caption = 'Run'
+        OnClick = mnuStartClick
+      end
+    end
+    object mnuTools: TMenuItem
+      Caption = '&Tools'
+      object mnuOptions: TMenuItem
+        Caption = '&Options'
+      end
+    end
+    object mnuHelp: TMenuItem
+      Caption = '&Help'
+      object mnuAbout: TMenuItem
+        Caption = '&About...'
+        OnClick = mnuAboutClick
+      end
+    end
+  end
+  object tmrClose: TTimer
+    Interval = 2000
+    OnTimer = tmrCloseTimer
+    Left = 536
+    Top = 8
+  end
+  object dlgOpenDialog: TOpenDialog
+    Title = 'Open'
+    Left = 568
+    Top = 88
+  end
+  object dlgSaveDialog: TSaveDialog
+    Title = 'Save As'
+    Left = 392
+    Top = 88
+  end
+end
