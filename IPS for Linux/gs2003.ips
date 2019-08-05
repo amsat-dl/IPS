@@ -1,0 +1,193 @@
+(IPS-M Rotation Operators, Karl Meinzer 16.4.83 )
+: *F VERT DUP <0 JA?   CHS P* CHS
+                 NEIN: P*
+                 DANN  VERT WEG ;
+39797 KON KORR   10430 KON 1RAD     #4000 KON C/4
+: R>P  C/4 ZWO <0 JA?   CHS RDU CHS VERT
+                  NEIN: RDU VERT CHS
+                  DANN 0 RP-LOOP WEG KORR *F VERT ;
+: T-R  C/4 ZWO <0 JA?   + RDU VERT CHS
+                  NEIN: - RDU CHS VERT
+                  DANN 0 TR-LOOP KORR *F RDU KORR *F RDU WEG ;
+: /A/  DUP <0 JA? CHS DANN ;
+: /N S>R DUP <0 JA?   CHS 1RAD P* R>S P/ CHS
+                NEIN: 1RAD P* R>S P/
+                DANN ;
+( End of plane trigonometry )
+( Spherical Trigonometry, Karl Meinzer 15.8.79 )
+: 3P>R ( R,L,B -> X,Y,Z )
+  VERT RDU 0 VERT T-R RDU 0 RDO T-R RDO ;
+: 3R>P ( X,Y,Z -> R,L,B )
+  RDU R>P RDU VERT R>P RDO VERT ;
+: PROJECTION ( LP,BP,LN,BN -> C/4*COS{ PR }, L,B )
+  C/4 - S>R C/4 + RDO ZWO - RDO C/4 RDU 3P>R I T-R WEG 0
+  R>S CHS T-R 3R>P S>R RDO + R>S ;
+: A.B ( LA,BA, LB,BB -> C/4.COS )
+  S>R S>R VERT R>S - VERT C/4 RDU 3P>R RDO VERT C/4 R>S -
+  T-R RDU PWEG ;
+: AXB ( LA,BA,LB,BB -> C/4.SIN,LC,BC )
+ C/4 - ZWO S>R S>R RDO VERT - VERT C/4 RDU 3P>R RDO VERT I CHS
+ T-R WEG CHS VERT 0 R>S T-R RDU VERT RDO 3R>P VERT R>S + VERT ;
+: SK2 ( HYP, KATH.1 -> KATH.2 )
+  1RAD 0 RDO T-R WEG VERT 1RAD 0 RDO T-R WEG ( COS.K COS.H )
+  DUP <0 DUP JA? VERT CHS VERT DANN S>R VERT
+  DUP <0 DUP JA? VERT CHS VERT DANN R>S + S>R
+  /N /A/ DUP 1RAD > JA? WEG 1RAD DANN #2000
+   ANFANG 1RAD ZWO 0 VERT T-R S>R S>R ZWO R>S - R>S VERT S>R
+          DUP <0 JA?   CHS 8 + I VERT /N CHS
+                 NEIN:     8 + I VERT /N
+                 DANN - R>S /A/ 9 <
+   ENDE? VERT WEG R>S JA? #8000 VERT - DANN ;
+: -R3 0 2 JE S>R RDO R>S - RDU NUN ;
+: +R3 0 2 JE S>R RDO R>S + RDU NUN ;
+: -P3 3P>R 3V3 3P>R 3V3 -R3 3R>P ;
+: +P3 3P>R 3V3 3P>R 3V3 +R3 3R>P ;
+: @3 DUP @ VERT 2 + DUP @ VERT 2 + @ ;
+: !3 S>R I 4 + ! I 2 + ! R>S ! ;
+: @L3     2 + @ ;
+: @B3     4 + @ ;
+: @LB3    DUP @L3 VERT @B3 ;
+( End spherical trigonometry )
+
+( DATUMSANZEIGEROUTINE )
+: RDT ( TAG > Y M T ) 28430 + 1461 /MOD 365 /MOD VERT
+      DUP 4 = JA? PWEG 365 3
+              DANN RDO 4 * + 1900 + ( YR) VERT
+      10 * 4 + 306 /MOD 10 / 1 + VERT 3 +
+      DUP 12 > JA? 12 - RDO 1 + RDU
+               DANN RDO ;
+: DATUM  RDT 10 BASIS ! 8 LEERZ WAND " . " WAND " . " WAND ;
+
+
+( PHASE 3-D TRACKING SOFTWARE. 2001.6.14 - JRM )
+( 1. REFERENCE ORBITAL DATA OF May  31, 2001 NORAD )
+
+    1 VAR PHI     ( INTEGER # OR ORBITS PER DAY )
+17718 VAR PHF     ( FRACTIONAL # OF ORBITS PER DAY * 2**16 )
+33735 VAR RECTASR ( LONG.OF ASC. NODE OF REF-ORBIT )
+51415 VAR PERIGAR ( ARG. OF PERIGEE OF REF-ORBIT )
+  950 VAR INCL    ( INCLINATION )
+ 8564 VAR D#R     ( DAY# OF REF-ORBIT )
+64983 VAR TWR     ( TW AT TIME OF PERIGEE, REF-ORBIT )
+  286 VAR O#R     ( ORBIT# OF REF-ORBIT )
+
+37024 KON B/F     ( A/F * B/A )
+63868 KON A/F     ( A * 2 * PI * 1800 )
+ 8499 KON ES      ( E * 1RAD )
+  -29 KON KO      ( RECTAS-PERTURBATION PER ORBIT )
+   58 KON KW      ( PEIRGA-PERTURBATION PER ORBIT )
+
+( 2. OTHER REFERENCE DATA )
+18273 KON JZ0     ( L0  +16  AT 1.1.78 AT 0000 UTC )
+6    FELD STN     ( LOCATION OF EARTH-STATION )
+  ( MARBURG : ) 1800 (UNITS) 1593 (LON) 9248 (LAT) STN !3
+
+( 3. DYNAMIC VARIABLES AND FIELDS OF PROGRAM )
+0 VAR ZT    ( MEAN ANOMALY OF ORBIT = FRACTIONAL ORBIT )
+0 VAR O#    ( ORBIT# )
+0 VAR TW    ( TIME OF DAY IN ANGULAR UNITS )
+0 VAR L0    ( LONGITUDE OF 0-MERIDIAN )
+0 VAR PERIGA    0 VAR RECTAS
+
+6 FELD   T-AUX ( HOLD REGISTER OF TIME AND DAY OF CURRENT ORBIT)
+6 FELD   S-HOR ( S/C LOCATION IN HORIZON-COORDINATES )
+6 FELD   S-GEO ( S/C LOCATION IN GEO-COORDINATES )
+( 4. OPERATOREN )
+: Z>R,T  DUP
+  ANFANG DUP DUP ES 0 RDO T-R VERT S>R - ( PH-0 )
+    RDO VERT ZWO VERT - ( D-PH ) 1RAD R>S - /N S>R
+    VERT I + R>S /A/ 12 <
+  ENDE? VERT WEG ( E AUF STACK )
+1RAD 0 RDO T-R B/F *F VERT ES - A/F *F VERT R>P ;
+
+: KT:BAHN>AEQ ( L,B -> L,B )
+  VERT PERIGA @ + VERT C/4 RDU 3P>R INCL @ T-R 3R>P VERT
+  RECTAS @ + VERT RDO WEG ;
+
+: KT:GEO>HOR ( L,B -> L,B )
+  VERT STN @L3 - C/4 + VERT C/4 RDU 3P>R C/4 STN @B3 -
+  T-R 3R>P VERT C/4 + CHS VERT RDO WEG ;
+
+: TW,L0   ( PRODUCES TW & L0 FROM T-AUX )
+     1 3 JE T-AUX I + @B NUN 1800 * VERT 30 * + VERT 2 / +
+     0 VERT 43200 P/ DUP DUP TW ! ( TW TWICE ON STACK )
+     T-AUX 4 + @ 12053 P/ 33 * + JZ0 + L0 ! ;
+
+: O#,ZT    ( PRODUCES O# & ZT FROM T-AUX, TW AND REF-DATA )
+  TW @ T-AUX 4 + @ TWR @ D#R @ P- ( DAY,FRAC SINCE REF )
+  ZWO PHF @ P* VERT WEG RDU DUP PHI @ * RDU S>R PHI @ P* P+
+  R>S PHF @ P* P+ O#R @ + O# ! ZT ! ;
+
+: ORBIT-DATA ( COMPUTES ALL DATA AT TIME IN T-AUX OF ORBIT )
+  TW,L0  O#,ZT ( TIMES AND REF-POINTS )
+  O# @ O#R @ - DUP KO * RECTASR @ + RECTAS !
+                   KW * PERIGAR @ + PERIGA !
+  ZT @  Z>R,T  0 KT:BAHN>AEQ VERT L0 @ - VERT ( AEQ->GEO )
+  S-GEO !3 S-GEO @3  STN @3 -P3 KT:GEO>HOR S-HOR !3 ;
+
+
+: CONV   360 *F WAND ;
+: TPOS   TV0 + SP ! ;
+: ZZ  10 BASIS ! UHR T-AUX 6 >>> ORBIT-DATA  #380 TPOS #70 LEERZ
+  O# @ WAND " - " ZT @ 256 P* WAND WEG
+  #390 TPOS " H:  " S-GEO @ 3543 P* 10000 P/ 638 - WAND 
+  " 0 KM   L:  "
+  S-GEO @L3 360 P* DUP 180 > JA? 360 - DANN 
+  WAND WEG "    B:  " S-GEO @B3 CONV
+  #3C0 TPOS " D:  " S-HOR @ 3543 P* 10000 P/ WAND
+  " 0 KM  AZ:  " S-HOR @L3 360 P* WAND WEG "   EL:  "
+  S-HOR @B3 CONV 
+  ;
+  
+( UHRROUTINEN )  : HZ DUP 10 < JA? " 0 " DANN WAND ;
+: ZUHR #3E0 TPOS 18 LEERZ 10 BASIS ! UHR 4 + @ DUP DATUM
+  #3F4 TPOS "  T#  " WAND
+  #3EB TPOS UHR 3 + @B HZ " : " UHR 2 + @B HZ " : " UHR 1 +
+  @B HZ ( DV ) ;
+0 VAR AZEIT     0 VAR ADIS
+
+: LAUF   AZEIT @ UHR 1 + @B <>
+  JA? UHR 1 + @B DUP AZEIT ! ZUHR =0
+          JA? ZZ ADIS @ S-HOR @ DUP ADIS ! -
+              #300 TPOS #40 LEERZ DUP DUP 250 *
+              " D-24:  " WAND "  HZ   D-70:  "
+              86 * WAND "  HZ   D-2M:  " 29 * WAND "  HZ " (DV)
+  DANN    DANN ;
+
+: SUHR 256 * RDU VERT 256 * + RDO UHR 3 !FK ;
+
+: DT ( FORMAT: 'YEAR' 'MONTH' 'DAY' DT GIVES DAY# )
+ RDU 1 + DUP 4 < JA? VERT 1 - VERT 12 +
+                  DANN
+ 306 * 10 / VERT 1900 - DUP 365 * VERT 4 / + + + 28553 - ;
+( 1978. 1. 1. = DAY# 0 ; DAY OF WEEK: DAY# 7 MOD , 0 = SUNDAY )
+
+: PR  0 ZWO 0 VERT T-AUX 3 !FK  0 TPOS #180 LEERZ 10 BASIS !
+      WAND  #80 TPOS 0 24 JE I HZ "    " 2 +NUN
+      #C0 TPOS 0 24 JE " .  " NUN #100 TPOS
+      0 23 JE I T-AUX 3 + !B 0 T-AUX 2 + !B ORBIT-DATA S-HOR @B3
+              >0 JA? " - " NEIN: "   " DANN 30 T-AUX 2 + !B
+              ORBIT-DATA S-HOR @B3
+              >0 JA? " - " NEIN: "   " DANN
+           NUN ;
+
+: W4SM    1800 -14314   6921   STN !3 ;
+: G3RUH   1800     11   9505   STN !3 ;
+: DB2OS   1800   1780   9521   STN !3 ;
+: DJ4ZC   1800   1593   9248   STN !3 ;
+: VK5AGR  1800  24682  -6366   STN !3 ;
+: ZL1AOX  1800  31841  -6717   STN !3 ;
+: VP9MU   1800 -11808   5880   STN !3 ;
+: PA3FWM  1800   1247   9512   STN !3 ;
+
+
+
+1 PHI ! 16775 PHF ! 7011 RECTASR ! 35559 PERIGAR !
+1686 INCL ! 9328 D#R ! 27675 TWR ! 47 ? KW !
+8304 ? ES ! 64345 ? A/F ! 38935 ? B/F ! -24 ? KO !
+1246 ? O#R !
+
+PA3FWM
+
+1 EINH LAUF
+

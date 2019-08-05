@@ -1,0 +1,39 @@
+
+80 FELD digits   
+     #110E #1111 #1111 #000E
+     #0C04 #0414 #0404 #000E
+     #110E #0402 #1008 #001F
+     #110E #0E01 #1101 #000E
+     #0602 #120A #021F #0002
+     #101F #1E10 #1101 #000E
+     #0402 #1E08 #1111 #000E
+     #111F #0201 #0402 #0004
+     #110E #0E11 #1111 #000E
+     #110E #0F11 #0201 #0004 
+   digits 40 !FK
+
+: showbit ( byte bitnr -> byte) 
+    BIT ZWO UND =0 JA? #20 NEIN: #23 DANN SP @ !B ;
+
+: showbyte ( byte -> )
+    SP @ 5 + SP !  0 4 JE I showbit SP @ 1 - SP ! NUN WEG ;
+
+: showbytes 0 6 JE DUP I + @ showbyte SP @ 64 + SP ! NUN
+    SP @ 7 64 * - SP ! ;
+
+: showdigit 8 * digits + showbytes WEG ;
+
+: showdec
+   10 /MOD VERT showdigit
+   SP @ 7 + SP !
+   showdigit ;
+
+61 VAR prevsecs
+
+: bigclock UHR 1 + @B prevsecs @ = JA? RETEX DANN
+       UHR 1 + @B prevsecs !
+       TV0 SP ! UHR 3 + @B showdec   SP @ 14 + SP !
+                UHR 2 + @B showdec   SP @ 14 + SP !
+                UHR 1 + @B showdec  ;
+
+3 EINH bigclock
