@@ -1,0 +1,90 @@
+( AMSAT-OSCAR-40 Telemetry Capture                      )
+( Version 1.0.1 - August 4, 2001                        )
+( Copyright Paul C. L. Willmott, VP9MU                  )
+( Requires: ipsdos 1.0 build 24 or above                )                                                        
+
+( This code is designed for use with the G3RUH P3 PSK   )
+( demodulator Mk II                                     )
+
+( You must also select the P3BLK RX option for the      )
+( required serial port in the IPSDOS.CFG file           )
+
+#500 KON TLM-INFLAG  ( Ready for Input                  )
+#501 KON TLM-DATA-IN ( Block ready for Processing       )
+#502 KON TLMBUADDR   ( Telemetry Buffer Address         )
+#202 FELD TLMBU      ( Telemetry Buffer 512 + CRCC      )
+TLMBU TLMBUADDR !    ( Let the VM know the DMA address  )
+
+12 FELD TLMFNAME     ( Telemetry File Name              )
+( T000000.RAW )
+#3054 #3030 #3030 #2E30 #4152 #3057 TLMFNAME 6 !FK
+
+0 VAR TLMFHANDLE     ( File Handle for Telemetry File   )
+
+: CAPTURE-TLM
+
+  TLM-DATA-IN @B <>0 JA? ( Wait for a block to process  )
+
+      TLMBU TV0 #200 L>>> ( Move Block to Screen Buffer )
+
+      #FFFF TLMBU DUP #201 + ( Check CRCC               )
+      JE                 
+          I @B CYC2
+      NUN
+      <>0 JA?
+          7 TV0 SBIT    ( Flag Bad CRCC                 )
+      DANN
+
+      TLMFHANDLE @ DUP        
+      #200 TV0 RDO FWRITE WEG    ( Write block to file  )
+      FFLUSH WEG                 ( Flush Buffers        )
+
+      1 TLM-INFLAG !B   ( Set Ready for Input Flag      )
+      0 TLM-DATA-IN !B  ( Reset Block Ready Flag        )
+
+  DANN
+
+; ( CAPTURE-TLM ) 
+
+: START-CAPTURE
+
+  UHR 4 + @
+
+  28430 + 1461 /MOD 365 /MOD VERT
+  DUP 4 = JA? PWEG 365 3
+  DANN RDO 4 * + 1900 + ( YR) VERT
+  10 * 4 + 306 /MOD 10 / 1 + VERT 3 +
+  DUP 12 > JA? 12 - RDO 1 + RDU
+  DANN RDO 
+
+  1 6 JE
+      10 /MOD #30 + TLMFNAME I 1 + + !B 
+      10  MOD #30 + TLMFNAME I + !B 
+  2 +NUN
+  
+  2 TLMFNAME 11 FOPEN TLMFHANDLE ! 
+
+  1 TLM-INFLAG !B   ( Set Ready for Input Flag      )
+  0 TLM-DATA-IN !B  ( Reset Block Ready Flag        )
+  
+  6 EINH CAPTURE-TLM 
+  
+
+; ( START-CAPTURE )
+
+: STOP-CAPTURE
+
+  6 AUSH
+
+  TLMFHANDLE @ FCLOSE WEG
+
+  0 TLM-INFLAG !B   ( Reset Ready for Input Flag    )
+  0 TLM-DATA-IN !B  ( Reset Block Ready Flag        )
+
+; ( STOP-CAPTURE )
+
+START-CAPTURE
+  
+"               AO-40 Telemetry Capture Started!              "
+#01C0 !T
+

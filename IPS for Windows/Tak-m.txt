@@ -1,0 +1,8 @@
+: TAK ANFANG PDUP < JA?
+            DUP S>R RDU PDUP R>S
+            1 - TAK S>R
+            DUP S>R RDU PDUP R>S
+            1 - TAK S>R
+            DUP S>R RDU PDUP R>S
+            1 - TAK S>R PWEG WEG
+            R>S R>S R>S DANN/NOCHMAL PWEG ;
