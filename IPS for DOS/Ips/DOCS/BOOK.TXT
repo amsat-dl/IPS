@@ -1,0 +1,94 @@
+                             Anyone for IPS?
+                             ---------------
+
+                          by James Miller G3RUH
+
+The Oscar-40 satellite, like its predecessors P3A, Oscar-10 and Oscar-13, 
+has as its "brains", a computer system based on the RCA COSMAC 1802 
+microprocessor.
+
+The computer is running an operating system called "IPS", and loaded into
+that environment is the flight software that does spacecraft command and
+control, housekeeping chores, battery charge control, navigation, transponder
+switching, beacon data generation and so on.
+ 
+             But how many people know anything about IPS?
+
+Not many nowadays, I'll bet.  Well, here's a unique opportunity to discover
+all about it.
+
+IPS (Interpreter for Process Structures) was devised by Karl Meinzer DJ4ZC
+at a time when 1802, 6502, 6800 and 8080/Z80 processors were state of the
+art; around 1976-1979.
+
+At that time there just wasn't an easy-to-use, robust, engineering-
+oriented, multitasking and, above all, *portable* operating system for
+cheap computers based on these MPUs and their tiny (boldly described as
+"massive") 16 Kbyte memories. Computers at that time meant the Atari 800,
+North Star Horizon etc.
+
+An IPS Manual was written by Karl Meinzer in 1978, but never published
+in any substantive form.  A hand corrected draft printout was circulated to
+a few interested AMSAT engineers who then reproduced it ad hoc, minus
+several chunks, via ever worsening photocopies.  But the paper original was
+long lost.
+
+Happily, in 1996 the manual was discovered to have survived on Atari 800XL
+computer cassette tapes, and moreover in the mid '80s had been transferred
+to floppy disc by Robin Gape G8DQX, a prominent IPS contributor at that
+time.
+
+Thus, after a gap of nearly two decades, it has become practical to publish
+the document properly, and that's what I have done.
+
+IPS is a threaded language not unlike Forth, a brilliant piece of software
+engineering, as relevant today as it ever was.
+
+From Karl's introduction I quote:
+
+  "This book is organized into three chapters of increasing sophistication.
+  Chapter I presents an introduction to the language; the material
+  presented there will enable you to accomplish all "regular" programming
+  tasks. Chapter II introduces the assemblers for the COSMAC 1801/1802, the
+  8080, the 6800 and the 6502 allowing low-level extensions and interfaces.
+  Finally, Chapter III describes and documents the inner workings of IPS;
+  this material will be useful if you wish to extend or change IPS itself."
+
+Sample pages (GIFs) are available at:
+
+http://www.jrmiller.demon.co.uk/IPS/
+
+___________________________________________________________________________
+
+
+"IPS - High Level Programming of Small Systems" by Karl Meinzer, is a 120
+page A5 book in wire-bound manual format, edited, typeset and re-published at
+my own expense to recognise the author's 30 years unparalleled contributions
+to the amateur satellite programme.  Text in English.
+
+      Net proceeds from the sale of this book will be donated to the
+                       P3D Satellite Project.
+
+You may order direct from MYSELF or, if more convenient, from AMSAT-NA.
+Books are available for immediate despatch.
+
+Order from: James R Miller, 3 Benny's Way, Coton, Cambridge, CB3 7PS, England
+(g3ruh@amsat.org) at a price of UKP 19.00, plus postage UK/Europe UKP 1.00,
+rest-of-world UKP 3.00. 
+Sterling Cheques, Eurocheques, Travellers Cheques, Cash, or bank draft drawn
+on a London bank.  Also electronic funds transfer, please add UKP 7 bank
+charges.  No credit cards.  You can "buy" English pound notes at many banks.
+I can also accept US dollars in cash only (green notes/travellers cheques)
+at a rate of $2 per UKP.
+ Tel: +44 1954 210388. Fax: +44 1954 211256.
+
+
+
+Order from: AMSAT-NA, 850 Sligo Ave., Suite 600, Silver Spring, MD 20910-4703,
+USA (martha@amsat.org) at a price of $36.00 plus postage North America $2.00,
+rest-of-world $6.00.  MC/Visa taken.
+ Tel: +1 301-589-6062. Fax: +1 301-608-3410.
+
+
+James Miller G3RUH  1997 May 12
+<end>

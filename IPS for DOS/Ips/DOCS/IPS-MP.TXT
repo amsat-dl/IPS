@@ -1,0 +1,596 @@
+IPS-MP.TXT                                                  2001-Nov-29
+
+                                                   
+                  IPS-Mp for IBM-PC Compatible Computers
+                         under MS-DOS 4.X and above
+                  --------------------------------------
+
+           IPS-Mp & IPS-X Kernals (C) 1996-2001 James Miller G3RUH
+               ipsdos engine (c) 2000-2001 Paul Willmott VP9MU
+
+                  This document written by James Miller, G3RUH
+                   edited for ipsdos by Paul Willmott, VP9MU
+
+This is IPS-Mp v2.05 / ipsdos 1.0 for IBM-PC compatible computers.  Please read the 
+whole of this file before you get hacking.
+
+System Requirements
+-------------------
+
+IBM-PC Compatible Computer
+80386 or better processor 16MHz or above
+VGA Compatible Video Adapter
+128k Memory
+500k Disk space
+MS-DOS 4.X or above
+Optional: Serial Communication Ports
+
+To Run
+------
+
+From the MS-DOS command line type: 
+
+ipsdos 
+
+then <ret>.
+
+NOTE: This program is designed to run under plain MS-DOS, however shortcuts are 
+provided for:
+
+Windows 95/98/98se/ME - IPS9x.PIF
+Windows NT4/2000      - IPSnt.PIF
+Acorn Risc Machine    - IPSacorn.PIF
+
+To Use
+------
+
+Input, output and operation is as described in the book "IPS - High Level
+Programming of Small Systems" by Karl Meinzer (1978), ISBN 0-9530507-0-X.
+There are minor differences:
+
+ - Standard words are in German.  
+ - At errors, the offending word is displayed in inverse video and the cursor
+   placed at the start of the word.
+ - The cursor control keys may also be used.  
+ - The <Ins> key is used to toggle between insert and overwrite keyboard modes.
+
+OUTPUT: Is virtually identical to IPS-N for the Atari 800XL etc
+
+INPUT:  1. You enter commands by typing them in the usual way.
+
+        2. Or you can read a file.  For example, enter:
+
+          " TRIG " READ   <enter>
+      
+Quitting
+--------
+
+Press Alt+X .
+
+_____________________________________________________________________________
+
+IPS-Mp Design
+-------------
+
+A listing of the IPS-Mp source is supplied in IPS-MP3.SRC included in the
+sistribution zip file.
+
+The M-9097 Meinzer Computer has 64K of memory, used as follows:
+
+  Screen Buffer:    #000 -  #3FF
+  Syspage:          #400 -  #4FF
+  Engine Workspace: #500 -  #50F
+  IPS:              #510 - #14FA
+  User:            #14FB - #xxxx
+  Parameter stack: #xxxx - #FFF8
+  Return stack:     #480 -  #4F8
+  
+Code routines are in an imaginary ROM.
+
+The stacks are "Full-Descending" type with the LS byte at the lower address.
+
+The Generic IPS Specification Draft C is implemented (as per the paper copy),
+with the exception of assembler-oriented utilities:
+           RCODE  CODE  NEXT  ERZ>  MACHT> MACHT/CODE>  I>  <I
+
+There are 8 chain positions, numbered 0 - 7, accessed with EINH and AUSH.
+The stack display routine is allocated to chain position 0.
+The time is at UHR, and the four stopwatches are included SU0 - SU3 .
+
+
+Additional words: (IPS Spec. Draft E) familiar from IPS-C:
+----------------
+
+P/      is like P/MOD but returns the quotient only.  See IPS Spec.
+
+CHS     changes the sign of the item on the stack
+
+        <n>  CHS
+        <-n>
+
+CYC2    takes 16-bit seed and a byte and returns the crcc'd value.
+        Typically used in a loop, e.g   #FFFF 0 511 JE I @B CYC2 NUN 
+
+        <seed>  <byte> CYC2
+        <new seed>
+        
+P+      double-length addition.  Adds two 32-bit numbers and returns result
+        on the stack
+
+        <ls word A>   <ms word A>   <ls word B>   <ms word B>  P+
+        <ls word A+B> <ms word A+B>
+        
+P-      double-length subtraction; similar to P+
+
+        <ls word A>   <ms word A>   <ls word B>   <ms word B>  P-
+        <ls word A-B> <ms word A-B>
+
+
+New words: 
+---------
+
+AWEG (German) 
+CLS (English)
+
+        Clears the stack; Clear Screen.  This word cannot be used inside a
+        definition.   (Type is :INT)
+
+        CLS
+        empty
+        
+
+LANG    Sets language for error messages;  0 = German,  1 = English
+
+        < language > LANG
+        empty
+        
+
+READ    Executes a file.   This will read the file, compile definitions
+        therein and execute any commands.
+
+        < " FileName " >  READ
+        empty
+
+        Error conditions:
+          No filename.
+          File not found etc.
+          On error, 2 bytes are left on the stack.
+          
+        Example:
+        
+        " TRIG " READ               Loads and compiles trigonometry library  
+          
+        This word cannot be used inside a definition.
+
+
+$SAVE   Saves a block of memory to file.  Start address, limit address
+        ( = final address + 1 ) and a file name must be specified.
+        Saved block size is rounded up to a multiple of 512 bytes.
+        
+        This word cannot be used inside a definition.
+
+        <start_address>  <limit_address> < " FileName " >  $SAVE
+        empty
+
+        Examples:
+        
+        #400  #500  " Syspage "    $SAVE   write 512 bytes to a file named
+                                           "Syspage" in the current directory.
+                                           
+        #0 #FFFF    " MP-bin "    $SAVE    saves entire IPS memory overwriting 
+                                           the standard build.(*)
+                                          
+        Error conditions:
+          Block length specified zero or negative.
+          Bad filename; existing file locked or open, or is a directory etc.
+          On error, start and limit addresses are left on the stack.
+
+(*) Notes  
+So next time you run IPS-Mp, it will start up exactly as you saved it, new
+definitions, chain, time and screen included.  The stack will however be
+empty.
+
+You might choose use another name to save "your" IPS.  For example with, #0
+#FFFF  " MyBuild " $SAVE .  This can be invoked after start-up by using the
+$LOAD command (see below).  Alternatively you can edit the application's 
+configuration file (IPSDOS.CFG) to invoke MyBuild  rather than the specified  
+MP-bin.
+
+You might not wish to save the screen, and you might not have any work beyond
+HIER.  So you could enter:  #400 HIER " MyBuild2 " $SAVE . Of course you MUST
+re-load this to #400 see below), and never invoke such a file from the configuration
+file, which always loads to the start of IPS memory (#0000).  
+          
+                 
+
+
+$LOAD   Loads a file to memory.  Load address and file name must be specified.
+        This word cannot be used inside a definition.
+
+        <load_address> < " FileName " >  $LOAD
+        empty
+
+        Example:
+
+        #2000  " ArrayData " $LOAD          Loads the file "ArrayData" to
+                                            memory address #2000 
+
+        #0     " MP-bin "    $LOAD          Re-start IPS
+        
+        #0     " MyBuild "   $LOAD          Re-start IPS using "your" build
+                                            ( see $SAVE notes )
+        #400   " MyBuild2 "  $LOAD          Re-start IPS without screen data
+                                            ( see $SAVE notes )
+
+
+        Error conditions:
+          File not an IPS binary image.
+          File too big; will overflow memory.  File is zero length.
+          File not found etc.
+          On error, load address is left on the stack.
+          
+S-ON    Stack display on.
+        You turn the stack display off with 0 AUSH .
+        
+$TVS    The stack display is positioned on-screen at the address given by
+        the constant $TVS .  To place the stack display elsewhere, for example
+        on the 6th line, enter:   #140   ? $TVS ! 
+
+IBM-PC Extensions
+-----------------
+
+@PCPORTB    Reads the PC I/O Port address M, and places the byte on top of 
+            the parameter stack                
+
+           <M> @PCPORTB
+
+@PCPORT     Reads the PC I/O Port address M, and places the word on top of 
+            the parameter stack                
+
+           <M> @PCPORT  
+
+!PCPORTB   Writes the byte N to the PC I/O Port address M    
+
+           <N> <M> !PCPORTB 
+
+!PCPORT    Writes the word N to the PC I/O Port address M    
+
+           <N> <M> !PCPORT
+
+@PCMEMB    Reads the PC Memory address Seg:Off, and places   
+           the byte on top of the parameter stack            
+
+           <Seg> <Off> @PCMEMB
+
+@PCMEM     Reads the PC Memory address Seg:Off, and places   
+           the word on top of the parameter stack            
+
+           <Seg> <Off> @PCMEM
+
+!PCMEMB    Writes the byte N to the PC Memory address Seg:Off    
+                                       
+           <N> <Seg> <Off> !PCMEMB
+
+!PCMEM     Writes the word N to the PC Memory address Seg:Off    
+                                       
+           <N> <Seg> <Off> !PCMEM
+
+AUXOUTB    Writes the byte <N> to the output buffer of COM   
+           Port <M>   
+                                       
+           <N> <M> AUXOUTB                                   
+
+AUXINB     Reads a byte from the input buffer of COM Port    
+           <M>, and places it on the parameter stack.        
+
+           <M> AUXINB                                        
+
+AUXINCOUNT Places the number of characters in the input      
+           buffer of COM Port <M> on the parameter stack     
+
+           <M> AUXINCOUNT                                      
+
+AUXOUTCOUNT Places the number of characters in the output     
+           buffer of COM Port <M> on the parameter stack     
+
+           <M> AUXOUTCOUNT                                    
+
+AUXREAD    Reads N bytes from the specified COM Port Buffer <M>           
+           to the buffer at address Addr.                          
+                                                            
+           Returns the actual number of bytes read on the stack if 
+           successfull, otherwise 0.                               
+
+           <N> <Addr> <M> AUXREAD                         
+
+AUXWRITE   Writes N bytes from the buffer at address Addr to the   
+           specified COM Port Buffer <M>                                  
+                                                            
+           Returns the actual number of bytes written on the stack 
+           if successful, otherwise 0.                             
+
+           <N> <Addr> <M> AUXWRITE                                 
+
+AUXCLRBUF  Empties the input buffer associated with specified COM  
+           Port <M>                                                
+                                                            
+           Returns nothing                                         
+        
+           <M> AUXCLRBUF                                           
+
+DEFKEYMACRO Defines a keyboard macro. A test string may be associated
+            with an IBM-PC extended keybaord code. Once the macro is
+            defined then when the use presses the key, the associated
+            text is forced into the input buffer and the compiler called.
+
+
+            <String Start Addr> <String Len> <Scan Code> DEGKEYMACRO
+
+Scan Code     	Meaning
+3		NUL
+15		Shift Tab
+16-25		Alt-Q/W/E/R/T/Y/U/I/O/P
+30-38		Alt-A/S/D/F/G/H/J/K/L
+44-50		Alt-Z/X/C/V/B/N/M
+59-68 		F1-F10
+71	        Home
+72		Up arrow
+73		PgUp
+75		Left Arrow
+77		Right Arrow
+79		End
+80		Down Arrow
+81		PgDn
+82		Ins
+83		Del
+84-93		F11-F20 (Shift F1-F10)
+94-103		F21-F30 (Ctrl-F1-F10)
+104-113		F31-F40 (Alt-F1-F10)
+114		Ctrl-PrtSc
+115		Ctrl-Left-Arrow
+etc                      
+
+MS-DOS Extensions
+-----------------
+
+FOPEN      Opens the specified file, in the mode specified by         
+           OpenMode                                                   
+                                                            
+           OpenMode:                                              
+                                                            
+           0 = Open file as read only. Fail if file does not      
+               exists. The file pointer is placed at the start    
+               of the file.                                       
+                                                            
+           1 = Create a file for read/write, if the file exists   
+               then it is replaced. The file pointer is placed    
+               at the start of the file.                          
+                                                            
+           2 = Open a file for read/write, if the file exists     
+               then the file pointer is placed at the end of the  
+               file. If the file does not exist then it is        
+               created.                                           
+                                                            
+           Returns a non-zero file handle on the stack if          
+           successful, otherwise 0.                                
+
+           <OpenMode> <Filename Start Addr> <Filename Len> FOPEN      
+
+
+FCLOSE     Closes the specified file                               
+                                                            
+           Returns 1 on the stack if successfull, otherwise 0.     
+
+           <Handle> FCLOSE                                         
+
+FEOF       Returns 1 on the stack if there is nothing left to read 
+           from the specified file, otherwise 0.                   
+
+           <Handle> FEOF                                           
+         
+FREAD      Reads N bytes from the specified file, starting at the  
+           current file pointer position, to the buffer at address 
+           Addr.                                                   
+                                                            
+           Returns the actual number of bytes read on the stack if 
+           successfull, otherwise 0.                               
+
+           <N> <Addr> <Handle> FREAD                               
+
+FWRITE     Writes N bytes from the buffer at address Addr to the   
+           specified file, starting at the current file pointer    
+           position.                                               
+                                                            
+           Returns the actual number of bytes written on the stack 
+           if successful, otherwise 0.                             
+
+           <N> <Addr> <Handle> FWRITE                              
+
+FGETB      Reads 1 byte from the specified file, starting at the   
+           current file pointer position, and places it in the LSB 
+           of the return value.                                    
+                                                            
+           If successfull the MSB of the return value is 1,        
+           otherwise 0                                             
+
+           <Handle> FGETB                                          
+           <Return Value>                                          
+ 
+FPUTB      Writes the LS-byte of N to the specified file, starting 
+           at the current file pointer position.                   
+                                                            
+           If successfull the return value is 1, otherwise 0       
+
+           <N> <Handle> FPUTB                                      
+           <Return Value>                                          
+
+FFLUSH     This routine forces all data in MS-DOS's internal       
+           buffers associated with the specified handle to be      
+           physically written to the disk, the time and date stamp 
+           and file size in the file's directory entry are         
+           updated. It is equivalent to closing then re-opening    
+           the file, with the benefit of not changing the file     
+           handle value.                                           
+                                                            
+           Returns 1 on the stack if successfull, otherwise 0.     
+
+           <Handle> FFLUSH                                         
+
+FSEEK      Changes the file pointer for the selected file.         
+                                                            
+           Mode:  = 0  Absolute Offset Start of File               
+                  = 1  Signed Offset from Current File Pointer     
+                  = 2  Signed Offset from End of File              
+                                                            
+           Returns the 3 words on the stack.                       
+                                                            
+           <New Absolute Offset, least sig. 16 bits>               
+           <New Absolute Offset, most sig. 16 bits>                
+           <Status>                                                
+                                                            
+           Where Status = 1 if successfull, 0 if failure.          
+
+           <Offset, least sig. 16 bits> <Offset, most sig 16 bits> 
+           <Mode> <Handle> FSEEK                                   
+
+FSIZE      Returns the 32-bit length of the specified file         
+           or -1 -1 if error                                       
+
+           " filename " FSIZE                                      
+
+FDELETE    Deletes the specified file.                             
+                                                            
+           Returns 1 on the stack if successfull, otherwise 0.     
+
+           <Filename Start Address> <Filename Length> FDELETE      
+
+FRENAME    Renames the specified file.                             
+                                                            
+           Returns 1 on the stack if successfull, otherwise 0.     
+ 
+           <Old Filename Start Address> <Old Filename Length>      
+           <New Filename Start Address> <New Filename Length>      
+           FRENAME                                                 
+
+Trigonometry Words:      TR-LOOP   RP-LOOP   3V3
+------------------
+
+        Refer to the documentation file in "TRIG.ZIP" for details of
+        trigonometry code routines.
+ 
+_____________________________________________________________________________
+
+Configuration File & Command Line Parameters
+--------------------------------------------
+
+The ipsdos engine supports a number of command line parameters. Any command line 
+parameter/switch will override the corresponding setting in the configuration file 
+IPSDOS.CFG
+
+The ipsdos engine makes several direct BIOS calls, and like all true DOS programs it is 
+not well behaved!
+
+If you want to turn off the bios calls then start ipsdos with the command line 
+switch /NOBIOS
+
+To set the IPS clock at start-up to the DOS clock use the command 
+line switch /SETCLOCK
+
+To display the IPS clock in the bottom left corner of the "IBM-PC"
+screen use the command line switch /SHOWCLOCK
+
+To start the engine in cross-compiler mode (IPS-X) use the /X command line
+switch. The IPS-X kernal is not included in the distribution zip, and is not 
+available.
+
+The IPSDOS.CFG file contains environment information for the ipsdos engine.
+
+The single quote character indicates a comment, anything following the quote 
+character will be ignored by ipsdos.
+
+' ---------------------------------------------------------
+' IPSDOS Hardware Configuration File
+' ---------------------------------------------------------
+ 
+' *** WARNING ***
+
+' IPSDOS does not carry out any error checking when loading
+' this file, so take great care when editing it!!!!!!!!!!!!
+
+' NOTE: Command line switches will override the settings in
+'       this file!
+
+' ---------------------------------------------------------
+
+' GENERAL SETTINGS
+' ----------------
+
+NOBIOS    = FALSE
+SLOWVIDEO = FALSE
+SHOWCLOCK = TRUE
+SETCLOCK  = TRUE
+UTC-OFFSET = -3.0    
+
+' SUPPORT FILE PATHS
+' ------------------
+
+DEFAULT-KERNAL = 0 ' 0=DESKTOP, 1=REMOTE, 2=IPS-X
+DESKTOP-KERNAL-BIN = MP-BIN
+REMOTE-KERNAL-BIN = MP-BIN
+IPSX-KERNAL-BIN = IPS-XP.BIN
+OSCLI-CMD  = \COMMAND.COM  
+
+' SERIAL PORTS         
+' ------------
+
+AUX = 1
+SETTINGS = 1200,N,8,1
+RXFORMAT = P3BLK ' P3CMD | P3BLK 
+TXFORMAT = NONE ' P3BLK | BLK
+END
+
+AUX = 2
+SETTINGS = 9600,N,8,1
+RXFORMAT = NONE ' P3CMD | P3BLK 
+TXFORMAT = NONE ' P3BLK | BLK
+END
+
+'AUX = 3
+'SETTINGS = 1200,N,8,1
+'RXFORMAT = NONE ' P3CMD | P3BLK 
+'TXFORMAT = NONE ' P3BLK | BLK
+'END
+
+'AUX = 4
+'SETTINGS = 1200,N,8,1
+'RXFORMAT = NONE ' P3CMD | P3BLK 
+'TXFORMAT = NONE ' P3BLK | BLK
+'END
+ 
+_____________________________________________________________________________
+
+Program Notes
+-------------
+
+The M-9097 engine is written in Borland Turbo Pascal 7.0.  Via the
+emulator loop it supports the ~64 code routines referenced from MP-bin.  It
+also services keyboard input, file i/o, serial i/o, 20ms clocks and 
+screen display.
+
+The source code for the ipsdos engine is included in the IPSSRC.ZIP file in the
+distribution zip file.
+
+_____________________________________________________________________________
+
+IPS Generic Specification
+-------------------------
+This was scanned by Bill Roth N7RYW from the original photocopy document, and
+is gratefully acknowledged.
+
+The ASCII was then corrected for scanning errors by JRM, then additions/
+updates made, mainly at the end.
+
+There is, as of 1997 Feb 08, some more to be included, since the original
+ASCII file has come to light. (Tnx Robin Gape).  A revision is pending.
+_____________________________________________________________________________
+<end>

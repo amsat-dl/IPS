@@ -1,0 +1,42 @@
+( Routine to correct AO-40 clock ~ +7.2s/day.           )
+( V1.2  JM  2001 Mar 27                                 )
+
+( Modified by Paul Willmott 2001 Jun 24 for Deskpro 333 )
+( +79.5s/day - updates based per minute rather than hr  )
+
+( Each minute add small amount to ss with BCD arithmetic)
+( Total adjustment is {59*CSEC/M + CSEC/H}  cs/hour     )
+( Assumptions:  Minute = 0; Sec <=58                    )
+( Note: cs corrections must be even values, range 0-98  )
+
+   UHR 2 + KON HR
+     HR @B VAR OLD-HR
+        4 KON CSEC/H ( 10 ms counts/min to advance; 1-59 utc )
+        94 KON CSEC/D (  ..      ..     ..    ..  ;   0  utc )
+: UHR-CORR
+
+  HR @B  OLD-HR @B <> JA?  ( new hour? )
+
+    HR @B DUP (hr) OLD-HR !B
+
+    =0 JA? (hr=0) 
+       CSEC/D  
+    NEIN: (hr=1-59) 
+       CSEC/H 
+    DANN
+
+    #FE UND (force lsb=0)      ( rest is BCD arithmetic )
+    UHR @                      ( grab SS.ss         )
+    DUP #FF00 UND VERT #FF UND ( -> #SS00, #ss      )
+    RDO +                      (     SS    .ss+CSEC )
+    DUP 100 >= JA?  100 - #100 ( test .ss rollover  )
+               NEIN:         0
+               DANN   RDO +    ( .ss+CSEC  SS' )
+    ODER                       ( recombine     )
+    
+    UHR !                      ( replace SS.ss )
+
+  DANN ;
+
+2 EINH UHR-CORR
+

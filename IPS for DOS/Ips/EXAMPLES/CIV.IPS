@@ -1,0 +1,209 @@
+( Icom CI-V Support Library                      )
+( Version 1.0.1 November 25, 2001                )
+( Copyright Paul Willmott, VP9MU                 )
+( for ipsdos 1.0 build 26+                       )
+
+( Reference: Icom Communication Interface - V    )
+(            Reference Manual 3rd Edition        )
+
+( Notes: Set the mode to NONE in the IPSDOS.CFG  )
+(        file, and the baud rate to that         )
+(        supported by the rig - the higher the   )
+(        better.                                 )
+(        Make sure that transceive mode is OFF   )
+
+#2E KON IC-970A   
+IC-970A KON RADIO-ADDR ( CI-V Address of Radio ) 
+2 KON RADIO-COM-PORT   ( COM2: )
+
+12 FELD CIVBU ( CI-V Output Buffer )
+#FEFE #E02E CIVBU 2 !FK
+
+( This outputs the CI-V command to the radio      )
+( Expects number of bytes to send on top of stack )
+
+: TCVR-SEND CIVBU RADIO-COM-PORT AUXWRITE WEG ;
+
+( This swaps the IC-970 Main & Sub Bands )
+
+: SWAP-MS #B007 #00FD CIVBU 4 + 2 !FK 7 TCVR-SEND ;
+
+( This sets the Main band as active )
+
+: MAIN-ACTIVE #D007 #00FD CIVBU 4 + 2 !FK 7 TCVR-SEND ;
+
+( This sets the Sub band as active )
+
+: SUB-ACTIVE #D107 #00FD CIVBU 4 + 2 !FK 7 TCVR-SEND ;
+
+6 FELD BCN-FREQ ( Beacon Freq Buffer - only 5 bytes used )
+
+#3000 #4532 #FD01 BCN-FREQ 3 !FK ( Raw Beacon Freq )
+
+6 FELD FREQBU ( Working Frequency Buffer )
+BCN-FREQ FREQBU 6 >>>
+
+( <BU Addr> DISP-FREQ )
+
+64 13 * KON DISP-ADDR
+
+: DISP-FREQ
+
+0 4 JE
+  DUP I + @B DUP
+  #F UND #30 + 
+  DISP-ADDR 8 + I 2 * 1 - - !B
+  16 / #30 + 
+  DISP-ADDR 8 + I 2 * - !B
+NUN
+WEG
+
+; ( DISP-FREQ )
+
+( This sets the radio frequency )
+: SET-FREQ #05 CIVBU 4 + !B FREQBU CIVBU 5 + 6 >>> 
+11 TCVR-SEND ; 
+
+6 FELD BCDOP2    ( Addition Register )
+6 FELD FREQ-UP   ( Up 10Hz           )
+6 FELD FREQ-DOWN ( Down 10Hz         )
+
+#0010 #0000 #FD00 FREQ-UP 3 !FK
+#9990 #9999 #FD99 FREQ-DOWN 3 !FK
+
+( This adds 2 BCD numbers together )
+
+: BCDADD
+
+#00 ( CLR CARRY )
+0 4 JE
+    FREQBU I + @B #0F UND BCDOP2 I + @B #0F UND +
+    + 10 /MOD VERT
+    FREQBU I + @B 16 / BCDOP2 I + @B 16 / +
+    + 10 /MOD VERT
+    RDU
+    16 * ODER FREQBU I + !B
+NUN
+WEG ( Remove CARRY )
+
+; ( BCDADD )
+
+0 VAR UP-COUNT
+0 VAR DOWN-COUNT
+772 KON DEMOD-PORT ( Prairie Digital I/O Port )
+30 FELD IN-BUFFER   ( Buffer to read from rig  )
+0 VAR LAST-MS
+0 VAR DUMP
+
+( Request Current VFO Frequency from radio just before )
+( the timer expires.                                   )
+
+: GET-FREQ
+
+30 IN-BUFFER RADIO-COM-PORT AUXREAD <>0 JA?
+    IN-BUFFER 11 + FREQBU 5 >>>
+    FREQBU DISP-FREQ 
+DANN
+
+; ( GET-FREQ )
+
+: REQ-FREQ
+30 IN-BUFFER RADIO-COM-PORT AUXREAD WEG
+#FD03 CIVBU 4 + ! 6 TCVR-SEND  
+; ( REQ-FREQ )
+
+48 KON SAMPLE-LIMIT
+SAMPLE-LIMIT VAR SAMPLE-FLAG
+
+: SAMPLE-DEMOD
+
+( Set the radio )
+
+SU2 @B #01 UND <>0 JA?
+
+( See which direction got the most votes in the last )
+( sample period                                      )
+
+    SAMPLE-FLAG @ =0 JA?
+         
+         GET-FREQ
+
+         UP-COUNT @ DOWN-COUNT @ <> JA?
+
+             UP-COUNT @ DOWN-COUNT @ > JA?
+                FREQ-UP
+             NEIN:
+                FREQ-DOWN
+             DANN
+             BCDOP2 6 >>>
+             BCDADD
+             SET-FREQ
+
+         DANN
+
+( Reset the up/down counts )
+
+         0 UP-COUNT ! 
+         0 DOWN-COUNT ! 
+
+         SAMPLE-LIMIT SAMPLE-FLAG !
+
+    NEIN:
+
+        DEMOD-PORT @PCPORTB DUP
+        
+        #1 UND <>0 JA?
+            UP-COUNT DUP @ 1 + VERT !
+        DANN
+        
+        #2 UND <>0 JA?    
+            DOWN-COUNT DUP @ 1 + VERT !
+        DANN
+
+        SAMPLE-FLAG @ SAMPLE-LIMIT 2 / = JA?
+            REQ-FREQ
+        DANN
+
+        SAMPLE-FLAG DUP @ 2 - VERT !
+
+    DANN
+
+( Check the PSK Demod status points every 20ms )
+( Start the timer again )
+
+    #0002 #0000 SU2 2 !FK
+    
+DANN
+
+; ( SAMPLE-DEMOD )
+
+: START-LOCK
+
+( Reset the up/down counts )
+
+0 UP-COUNT ! 
+0 DOWN-COUNT !
+
+( Set the I/O port for input on Port A )
+
+155 DEMOD-PORT 3 + !PCPORTB 
+
+( Start the timer again )
+
+REQ-FREQ
+#0002 #0000 SU2 2 !FK
+
+( Add Sampler to Chain )
+
+ 7 EINH SAMPLE-DEMOD 
+
+; ( START-LOCK ) 
+
+SUB-ACTIVE
+
+SET-FREQ
+
+"          Icom CI-V Library Ver:1.0.1 Loaded OK!            " 
+#01C0 !T
+
+

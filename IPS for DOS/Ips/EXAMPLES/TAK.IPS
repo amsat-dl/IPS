@@ -1,0 +1,15 @@
+( TAK Copyright Stacey Mills, W4SM                      )
+( It's a multilayered recursion. Takes about 5 minutes  )
+( or so on the IHU-1                                    )
+
+: TAK ANFANG PDUP < JA?
+DUP S>R RDU PDUP R>S
+1 - TAK S>R
+DUP S>R RDU PDUP R>S
+1 - TAK S>R
+DUP S>R RDU PDUP R>S
+1 - TAK S>R PWEG WEG
+R>S R>S R>S DANN/NOCHMAL PWEG ;
+
+( C B A TAK ) 6 12 18 TAK
+

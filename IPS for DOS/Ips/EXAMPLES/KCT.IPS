@@ -1,0 +1,182 @@
+( Kansas City Tracker Support Library        )
+( Copyright 2001 Paul Willmott, VP9MU        )
+( Version 1.0.3 November 25, 2001            )
+( for ipsdos 1.0 Build 26+                   )
+
+( This driver uses 2**16 value for 360 deg.  )
+( ADC values take values from 0-255          )
+
+( It assumes that the Elevation value        )
+( increases Up, and Azimuth increases left.  )
+
+( The Driver is added to the chain at        )
+( position 4.                                )
+
+#03E0 KON KCTPORT      ( KCT Control Port )
+
+#01 KON ADC0809_END
+#10 KON ADC0809_START
+#20 KON ADC0809_ALE
+#40 KON ADC0809_ADDA
+#8F KON ADC0809_MASK
+#F0 KON KCTSTOP_MASK
+
+#01 KON KCTMOVE_UP      ( Swap these 2 constants if down )
+#02 KON KCTMOVE_DOWN    ( increases the ADC value        )
+#04 KON KCTMOVE_RIGHT   ( Swap these 2 constants if left )
+#08 KON KCTMOVE_LEFT    ( increases the ADC value        )
+
+#0  VAR KCTCONTROL      ( KCT Control Port Value         )
+#0  VAR KCTTARGETAZIM   ( Target Azimuth   - ADC Units   )
+#0  VAR KCTTARGETELEV   ( Target Elevation - ADC Units   )
+#0  VAR KCTMOVEFLAG     ( <>0 if Move in Progress        )
+
+#4000 VAR KCTELEVRANGE  ( Elev Range 0..2**16 = 0..360   )
+0     VAR KCTELEVSKEW   ( Elev Skew  2**16 = 360 deg     )
+#1    VAR KCTELEVADCMIN ( Min ADC Elev Value             )
+#79   VAR KCTELEVADCMAX ( Max ADC Elev Value             )
+#2AAA VAR KCTELEVLIMIT  ( Maximum Allowed Elevation 60deg )
+
+#FFFF VAR KCTAZIMRANGE  ( Azim Range 0..2**16 = 0..360   )
+#0    VAR KCTAZIMSKEW   ( Azim Skew  2**16 = 360 deg +12 )
+2     VAR KCTAZIMADCMIN ( Min ADC Azim Value             )
+#D6   VAR KCTAZIMADCMAX ( Max ADC Azim Value             )
+
+
+( -------------------------- )
+( Get Analog Elevation Value )
+( -------------------------- )
+
+: KCTGETELEV 
+
+( Start ADC Conversion )
+
+  KCTCONTROL @B ADC0809_MASK UND DUP KCTPORT !PCPORTB
+  DUP ADC0809_START ADC0809_ALE ODER ODER KCTPORT !PCPORTB
+  KCTPORT !PCPORTB
+
+( Wait for Conversion to Complete ~215uS on 4.77MHz PC )
+
+  ANFANG KCTPORT @PCPORTB ADC0809_END UND =0 JA?
+  DANN/NOCHMAL
+
+( Read Elevation Value )
+
+  KCTPORT 1 + @PCPORTB 
+  
+; ( KCTGETELEV )
+
+( ------------------------ )
+( Get Analog Azimuth Value )
+( ------------------------ )
+
+: KCTGETAZIM
+
+( Start ADC Conversion )
+
+  KCTCONTROL @B ADC0809_MASK UND 
+  ADC0809_ADDA ODER DUP KCTPORT !PCPORTB
+  DUP ADC0809_START ADC0809_ALE ODER ODER KCTPORT !PCPORTB
+  KCTPORT PCPORT!B
+
+( Wait for Conversion to Complete ~215uS on 4.77MHz PC )
+  
+  ANFANG KCTPORT @PCPORTB ADC0809_END UND =0 JA?
+  DANN/NOCHMAL
+  
+( Read Azimuth Value )
+
+  KCTPORT 1 + @PCPORTB 
+  
+; ( KCTGETAZIM )
+
+( ------------ )
+( Stop Rotator )
+( ------------ )
+
+: KCTSTOP
+  
+  KCTCONTROL @B KCTSTOP_MASK UND ( Reset Motor Move Bits )
+  DUP KCTPORT !PCPORTB           ( Stop Hardware         )
+  KCTCONTROL !B                  ( Reset Software Copy   )
+  0 KCTMOVEFLAG !                ( Reset Flag            )
+
+; ( KCTSTOP ) 
+
+( -------------------------- )
+( Move Command in Degrees    )
+( <Az> <El> KCTMOVE          )
+( <Az> 2**16 = 360 degrees   )
+( <El> 2**16 = 360 degrees   )
+( -------------------------- )
+
+: KCTMOVE
+                          
+  DUP KCTELEVLIMIT @ > JA?
+      WEG 
+      KCTELEVLIMIT @
+  DANN 
+  KCTELEVSKEW @ +          
+  KCTELEVADCMIN @B DUP    
+  KCTELEVADCMAX @B VERT - 
+  KCTELEVRANGE @          
+  VERT /                  
+  VERT RDU /              
+  + KCTTARGETELEV !B      
+  
+  KCTAZIMSKEW @ +    
+  KCTAZIMADCMIN @B DUP 
+  KCTAZIMADCMAX @B VERT -
+  KCTAZIMRANGE @  
+  VERT /
+  VERT RDU /
+  + KCTTARGETAZIM !B
+  
+  1 KCTMOVEFLAG ! 
+  
+; ( KCTMOVEDEG ) 
+
+( ----------------------- )
+( Device Driver - Chained )
+( ----------------------- )
+
+: KCTDRIVER
+
+( Once stopped the Driver doesn't check )
+
+  KCTMOVEFLAG @ <>0 JA?
+
+     KCTCONTROL @B KCTSTOP_MASK UND ( Stop By Default )
+  
+     KCTGETAZIM KCTTARGETAZIM @B PDUP
+     <> JA?
+         < JA? KCTMOVE_RIGHT NEIN: KCTMOVE_LEFT DANN ODER
+     NEIN: 
+         PWEG
+     DANN
+  
+     KCTGETELEV KCTTARGETELEV @B PDUP
+     <> JA?
+         < JA? KCTMOVE_UP NEIN: KCTMOVE_DOWN DANN ODER
+     NEIN: 
+         PWEG
+     DANN
+
+     DUP DUP KCTCONTROL !B  ( Store Software Copy   )
+     KCTPORT !PCPORTB       ( Set I/O Port          )
+     #0F UND KCTMOVEFLAG !  ( Reset Flag if Stopped )
+
+  DANN  
+  
+; ( KCTDRIVER )
+
+( ----------- )
+( Setup Chain )
+( ----------- )
+
+ KCTSTOP  ( Init Everything )
+ 4 EINH KCTDRIVER 
+
+"       Kansas City Tracker Library Ver:1.0.3 Loaded OK!   " 
+#01C0 !T
+
